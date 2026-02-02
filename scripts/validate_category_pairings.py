@@ -85,7 +85,9 @@ Respond in JSON format:
 }}
 """
 
-    if provider == "openai":
+    if provider == "azure":
+        return _call_azure_openai(prompt)
+    elif provider == "openai":
         return _call_openai(prompt)
     elif provider == "ollama":
         return _call_ollama(prompt)
@@ -100,6 +102,38 @@ Respond in JSON format:
             "relationship_type": "unknown",
             "suggested_weight": 0,
         }
+
+
+def _call_azure_openai(prompt: str) -> dict:
+    """Call Azure OpenAI API."""
+    api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+    api_base = os.environ.get("AZURE_OPENAI_API_BASE")
+    api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-04-01-preview")
+    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+    
+    if not api_key or not api_base:
+        return {"valid": None, "confidence": 0, "reason": "Azure OpenAI not configured"}
+    
+    # Azure OpenAI endpoint format
+    url = f"{api_base.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
+    
+    response = requests.post(
+        url,
+        headers={
+            "api-key": api_key,
+            "Content-Type": "application/json",
+        },
+        json={
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.3,
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+    
+    content = response.json()["choices"][0]["message"]["content"]
+    return json.loads(content)
 
 
 def _call_openai(prompt: str) -> dict:
@@ -265,7 +299,7 @@ def generate_child_category_pairings(categories: list[dict]) -> list[tuple[str, 
 
 def main():
     parser = argparse.ArgumentParser(description="Validate category pairings with LLM")
-    parser.add_argument("--provider", default="openai", choices=["openai", "ollama", "litellm"])
+    parser.add_argument("--provider", default="azure", choices=["azure", "openai", "ollama", "litellm"])
     parser.add_argument("--categories", default="data/categories.json", help="Categories file")
     parser.add_argument("--output", default="data/validated_pairings", help="Output path")
     args = parser.parse_args()
