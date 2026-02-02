@@ -22,6 +22,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Import store context
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+try:
+    from context import STORE_CONTEXT, build_enriched_prompt, get_category_context
+    HAS_CONTEXT = True
+except ImportError:
+    HAS_CONTEXT = False
+    STORE_CONTEXT = ""
+
 
 # =============================================================================
 # LLM Integration
@@ -44,18 +53,27 @@ def get_llm_validation(
             "suggested_weight": int (1-90)
         }
     """
+    # Build enriched context if available
+    if HAS_CONTEXT and context is None:
+        context = build_enriched_prompt(source_category, target_category)
+    
     prompt = f"""You are a retail merchandising expert evaluating upsell/cross-sell recommendations.
 
-Given these two product categories from a safety/tactical/industrial supplies store:
+{STORE_CONTEXT if HAS_CONTEXT else "This is a safety/tactical/industrial supplies store."}
+
+Given these two product categories:
 - Source category (customer is buying): "{source_category}"
 - Recommended category (upsell suggestion): "{target_category}"
 
+{f"Category context: {get_category_context(source_category)}" if HAS_CONTEXT and get_category_context(source_category) else ""}
+{f"Target context: {get_category_context(target_category)}" if HAS_CONTEXT and get_category_context(target_category) else ""}
+
 Evaluate if this is a SENSIBLE upsell recommendation. Consider:
-1. Are these products logically complementary or used together?
+1. Are these products logically complementary or used together IN THE SAME JOB FUNCTION?
 2. Would a customer buying the source REALISTICALLY also need the target?
 3. Is this a professional/practical pairing (not random)?
 
-{f"Additional context: {context}" if context else ""}
+{context if context and not HAS_CONTEXT else ""}
 
 Respond in JSON format:
 {{
@@ -63,17 +81,8 @@ Respond in JSON format:
     "confidence": 0.0-1.0,
     "reason": "Brief explanation",
     "relationship_type": "accessory|complementary|bundle|unrelated",
-    "suggested_weight": 1-90 (higher = stronger recommendation)
+    "suggested_weight": 1-90 (higher = stronger recommendation, 51-70 for category level)
 }}
-
-Examples of VALID pairings:
-- Tactical Pants → Tactical Belts (complementary outfit)
-- Fire Helmets → Helmet Accessories (direct accessory)
-- Radios → Radio Straps (required accessory)
-
-Examples of INVALID pairings:
-- Fire Helmets → Gun Magazines (unrelated)
-- Tactical Pants → Fire Extinguishers (different use case)
 """
 
     if provider == "openai":
