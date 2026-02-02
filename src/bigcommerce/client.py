@@ -164,6 +164,63 @@ class BigCommerceClient:
         )
 
     # -------------------------------------------------------------------------
+    # Orders (for co-purchase analysis)
+    # -------------------------------------------------------------------------
+
+    def get_orders(
+        self,
+        min_date: Optional[str] = None,
+        status_id: Optional[int] = None,
+        limit: int = 250,
+    ) -> list[dict[str, Any]]:
+        """
+        Get orders with optional date/status filtering.
+        
+        Args:
+            min_date: Minimum date in RFC 2822 format (e.g., "Mon, 01 Jan 2024 00:00:00 +0000")
+            status_id: Filter by status (11=Completed, 10=Shipped)
+        """
+        # Orders are V2 API
+        url = f"https://api.bigcommerce.com/stores/{self.store_hash}/v2/orders"
+        params = {"limit": limit}
+        
+        if min_date:
+            params["min_date_created"] = min_date
+        if status_id:
+            params["status_id"] = status_id
+        
+        all_orders = []
+        page = 1
+        
+        while True:
+            params["page"] = page
+            response = self.session.get(url, params=params, timeout=self.timeout)
+            
+            if response.status_code == 204:  # No content
+                break
+                
+            response.raise_for_status()
+            orders = response.json()
+            
+            if not orders:
+                break
+            
+            all_orders.extend(orders)
+            page += 1
+            
+            if len(orders) < limit:
+                break
+        
+        return all_orders
+
+    def get_order_products(self, order_id: int) -> list[dict[str, Any]]:
+        """Get products for a specific order."""
+        url = f"https://api.bigcommerce.com/stores/{self.store_hash}/v2/orders/{order_id}/products"
+        response = self.session.get(url, timeout=self.timeout)
+        response.raise_for_status()
+        return response.json()
+
+    # -------------------------------------------------------------------------
     # Connection Test
     # -------------------------------------------------------------------------
 
