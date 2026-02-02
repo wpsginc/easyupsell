@@ -4,56 +4,63 @@ Tools for optimizing [Peasisoft Native Upsell](https://welcome.peasisoft.com/nat
 
 ## The Problem
 
-Co-purchase data is **sparse** — customers rarely buy complementary items together (boots + socks). We need a **hybrid approach**:
+1. **Sparse co-purchase data** — Customers rarely buy complementary items together
+2. **Noise in data** — Random pairings (fire helmet + gun magazine) are not useful
+3. **Need to CHANGE behavior** — Recommend what customers SHOULD buy together
 
-1. **Attribute-based rules** — Define logical pairings (boots → socks, flooring → underlayment)
-2. **Cross-sell gap analysis** — Identify products frequently bought alone
-3. **Sparse co-occurrence** — Validate rules with what little data exists
+## Solution: Hybrid Category-First Approach
 
-## Weight-Based Rollup System
+| Level | Weight | Strategy |
+|-------|--------|----------|
+| Product Accessories | 85-90 | Explicit mappings (radio → radio strap) |
+| Child Category | 51-70 | **LLM-validated** pairings (Tactical Pants → Tactical Belts) |
+| Parent Category | 31-50 | Broad fallbacks |
+| Global | 1-10 | Site-wide defaults |
 
-Peasisoft supports priority weights (1-100) with rollup:
-
-| Weight | Level | Strategy |
-|--------|-------|----------|
-| 91-100 | Reserved | Global overrides (promotions) |
-| 71-90 | Product | Attribute-based rules |
-| 51-70 | Category | Category affinity mappings |
-| 31-50 | Parent | Broad category fallbacks |
-| 1-10 | Global | Site-wide defaults |
+**Key insight:** Work at **child category level** (Tactical Pants, not Pants) with LLM validation to filter nonsense.
 
 ## Quick Start
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.template .env   # Add BC credentials
-
-# Test connection
-python scripts/test_bc_auth.py
+cp .env.template .env   # Add BC + LLM credentials
 
 # Analysis pipeline
-python scripts/analyze_bc_orders.py       # Find cross-sell gaps
-python scripts/export_categories.py       # Category structure
-python scripts/generate_rule_recommendations.py  # Apply merchandising rules
+python scripts/export_categories.py                    # Get category tree
+python scripts/validate_category_pairings.py          # LLM validates pairings
+python scripts/product_accessories.py --validate      # Product-level overrides
 ```
 
-## Output Files
+## Scripts
 
-| File | Description |
-|------|-------------|
-| `data/cross_sell_gaps.csv` | Products frequently bought alone (opportunities) |
-| `data/bc_cooccurrence.json` | Actual co-purchase data (likely sparse) |
-| `data/attribute_recommendations.json` | Rule-based recommendations with weights |
+| Script | Purpose |
+|--------|---------|
+| `validate_category_pairings.py` | LLM validates child category pairings |
+| `product_accessories.py` | Explicit product→accessory mappings |
+| `analyze_bc_orders.py` | Find cross-sell gaps (products bought alone) |
+| `export_categories.py` | Export BC category structure |
 
-## Customizing Rules
+## LLM Providers
 
-Edit `scripts/generate_rule_recommendations.py` to define your merchandising rules:
+Configure in `.env`:
+- **OpenAI** — `OPENAI_API_KEY` (gpt-4o-mini)
+- **Ollama** — `OLLAMA_HOST` (local llama3.2)
+- **LiteLLM** — `LITELLM_HOST` (Moltbot/Athena proxy)
 
+## Customizing
+
+### Product Accessories
+Edit `scripts/product_accessories.py`:
 ```python
-COMPLEMENTARY_RULES = [
-    ("boots", "socks", 85, "Footwear + socks pairing"),
-    ("flooring", "underlayment", 88, "Required accessory"),
-    # Add your rules here...
+PRODUCT_ACCESSORIES = [
+    ("RADIO-*", "RADIO-STRAP-*", 90, "Radio requires strap"),
+    ("HELMET-FIRE-*", "HELMET-SHIELD-*", 90, "Face shield"),
 ]
 ```
+
+### Category Validation Prompt
+The LLM prompt in `validate_category_pairings.py` understands:
+- Safety/tactical/industrial supplies context
+- Filters unrelated pairings (helmet + magazine = reject)
+- Suggests weights based on relationship type
