@@ -1,0 +1,182 @@
+[
+  {
+    "source": "PPE",
+    "target": "Custom Collar Insignia",
+    "valid": false,
+    "confidence": 0.86,
+    "reason": "PPE purchases are typically safety/industrial protection items, while custom collar insignia are uniform identification items. They are not required together, not a common field-use pairing, and often serve different procurement needs (safety compliance vs. uniform branding).",
+    "relationship_type": "unrelated",
+    "suggested_weight": 12
+  },
+  {
+    "source": "$25-$75",
+    "target": "Helmet Passports",
+    "valid": true,
+    "confidence": 0.72,
+    "reason": "Helmet passports (helmet ID/inspection tracking tags) are commonly used with fire/rescue helmets and help with accountability and maintenance records. A buyer in the $25-$75 range could plausibly be purchasing helmet-related accessories where this is a relevant add-on, though the source category is broad and not explicitly helmet-specific.",
+    "relationship_type": "accessory",
+    "suggested_weight": 56
+  },
+  {
+    "source": "Custom Collar Insignia",
+    "target": "Trauma Supplies",
+    "valid": false,
+    "confidence": 0.86,
+    "reason": "Custom collar insignia is a uniform identification item, while trauma supplies are medical consumables; they are not required accessories or typically purchased together as part of the same kit/outfit decision, making the pairing feel random at category level.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 8
+  },
+  {
+    "source": "PPE",
+    "target": "Line Tape",
+    "valid": true,
+    "confidence": 0.62,
+    "reason": "PPE and line tape are often used within the same industrial safety/jobsite function: PPE protects workers while line/marking tape helps control hazards, mark off restricted areas, and manage traffic during work. Not a required accessory, but a practical complementary safety purchase for many PPE buyers.",
+    "relationship_type": "complementary",
+    "suggested_weight": 56
+  },
+  {
+    "source": "Fire Hose",
+    "target": "Fire-Dex Helmets",
+    "valid": false,
+    "confidence": 0.78,
+    "reason": "Both are used in firefighting, but a fire hose purchase does not inherently imply a need for a new helmet; they are not required accessories or a typical paired purchase, making the upsell feel broad rather than practical.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 18
+  },
+  {
+    "source": "Belts and Harnesses",
+    "target": "Fire-Dex Helmets",
+    "valid": false,
+    "confidence": 0.86,
+    "reason": "Belts and harnesses are broad and used across multiple functions (tactical, industrial fall protection, rescue), while Fire-Dex helmets are specific to firefighting. There\u2019s no direct required-accessory or common kit relationship at the category level, so the pairing feels random unless the belt/harness is explicitly a firefighting/rescue harness.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 12
+  },
+  {
+    "source": "PPE",
+    "target": "Food",
+    "valid": false,
+    "confidence": 0.93,
+    "reason": "PPE purchases are job-function safety gear; \"Food\" is not a required accessory, standard kit component, or maintenance item for PPE and is not typically merchandised as a professional cross-sell in this context.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 5
+  },
+  {
+    "source": "Disposable Gloves",
+    "target": "Belts and Harnesses",
+    "valid": false,
+    "confidence": 0.9,
+    "reason": "Disposable gloves are general PPE used across many roles, while belts and harnesses are specialized load-bearing/positioning gear. They are not typically required together, don\u2019t complete the same kit, and the pairing feels random at category level.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 8
+  },
+  {
+    "source": "Fire Hose",
+    "target": "Belts and Harnesses",
+    "valid": false,
+    "confidence": 0.78,
+    "reason": "Fire hose purchases are typically paired with hose appliances (nozzles, couplings, adapters), storage/transport (hose rollers, racks), and maintenance/repair items. Belts and harnesses (e.g., fall protection or rescue harnesses) are used in firefighting/rescue but are not a required or commonly bundled accessory for hose specifically, making this feel indirect at the category level.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 22
+  },
+  {
+    "source": "Extinguishers",
+    "target": "Food",
+    "valid": false,
+    "confidence": 0.98,
+    "reason": "Fire extinguishers are safety equipment for fire prevention/response, while food is not a required accessory, commonly paired field item, or maintenance need within the same job function. The pairing appears random and not professionally relevant.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 1
+  },
+  {
+    "source": "Flashlight Accessories",
+    "target": "Helmet Passports",
+    "valid": false,
+    "confidence": 0.86,
+    "reason": "Flashlight accessories (mounts, batteries, chargers, filters) are typically tied to lighting tools, while helmet passports are identification/inspection tags used on helmets (often fire/rescue). They are not required together, don\u2019t complete the same kit, and the overlap in job function is weak and inconsistent.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 8
+  },
+  {
+    "source": "$25-$75",
+    "target": "Line Tape",
+    "valid": false,
+    "confidence": 0.78,
+    "reason": "The source category \"$25-$75\" is a price band, not a specific product type or job function, so it doesn\u2019t provide enough context to make Line Tape a logical, field-used complement. Line tape is only relevant for certain use cases (marking, staging, hazard/scene control), which won\u2019t apply to most purchases in that price range.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 12
+  },
+  {
+    "source": "$25-$75",
+    "target": "Flashlight Accessories",
+    "valid": false,
+    "confidence": 0.72,
+    "reason": "The source is a price band rather than a specific product type, so it\u2019s unclear the customer is buying a flashlight. Flashlight accessories are only a strong upsell when the source item is a flashlight or a lighting system; otherwise this pairing is too broad and can feel random.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 18
+  },
+  {
+    "source": "Belts and Harnesses",
+    "target": "Wound Care",
+    "valid": false,
+    "confidence": 0.86,
+    "reason": "Belts and harnesses are typically duty/utility or fall-protection/rigging items, while wound care is a medical supply category. Although some users may carry an IFAK on a belt, wound care is not a required or standard complementary add-on at the category level and spans different job functions, making the pairing feel random.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 18
+  },
+  {
+    "source": "Trauma Supplies",
+    "target": "PPE",
+    "valid": true,
+    "confidence": 0.78,
+    "reason": "Trauma supplies are used during patient care where responders typically also need PPE (e.g., gloves, eye/face protection, masks) for bloodborne pathogen and exposure control. This is a practical same-job-function pairing for EMS/first responders and industrial first aid scenarios.",
+    "relationship_type": "complementary",
+    "suggested_weight": 66
+  },
+  {
+    "source": "$25-$75",
+    "target": "Disposable Gloves",
+    "valid": false,
+    "confidence": 0.72,
+    "reason": "The source is a price range, not a specific product or job-function category, so disposable gloves cannot be reliably inferred as a required accessory or complementary item. Gloves are broadly useful in EMS/industrial contexts, but this pairing is too generic and risks being random.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 18
+  },
+  {
+    "source": "Disposable Gloves",
+    "target": "Flashlight Accessories",
+    "valid": false,
+    "confidence": 0.86,
+    "reason": "Disposable gloves are PPE/medical/industrial consumables, while flashlight accessories relate to lighting equipment. They are not required together, don\u2019t complete the same kit in a direct way, and the pairing feels random at category level without a specific use-case (e.g., a flashlight purchase).",
+    "relationship_type": "unrelated",
+    "suggested_weight": 12
+  },
+  {
+    "source": "Tactical Belts",
+    "target": "Helmet Passports",
+    "valid": false,
+    "confidence": 0.86,
+    "reason": "Tactical belts are duty/rigging belt systems for carrying gear, while helmet passports are identification/labeling items used with helmets (typically fire/rescue). They are not required accessories for each other and generally serve different workflows, making the pairing feel random at category level.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 8
+  },
+  {
+    "source": "Hose Bags",
+    "target": "Hose Washers",
+    "valid": true,
+    "confidence": 0.72,
+    "reason": "Both items are used in fire/rescue hose operations: hose bags are for carrying/deploying hose, and hose washers are commonly needed to maintain/repair hose couplings and prevent leaks. Not every hose-bag buyer will need washers immediately, but it\u2019s a practical maintenance add-on within the same job function.",
+    "relationship_type": "complementary",
+    "suggested_weight": 62
+  },
+  {
+    "source": "Custom Collar Insignia",
+    "target": "Hose Washers",
+    "valid": false,
+    "confidence": 0.93,
+    "reason": "Custom collar insignia is a uniform/identification item (law enforcement/military/EMS dress), while hose washers are plumbing/fire hose maintenance parts. They are not used together, not required accessories for one another, and typically belong to different purchasing workflows.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 5
+  }
+]

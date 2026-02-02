@@ -138,6 +138,19 @@ class BigCommerceClient:
         return products[0] if products else None
 
     # -------------------------------------------------------------------------
+    # Categories
+    # -------------------------------------------------------------------------
+
+    def get_category_tree(self) -> list[dict[str, Any]]:
+        """Get the full category tree."""
+        response = self._get("catalog/trees/categories")
+        return response.get("data", [])
+
+    def get_categories(self, limit: int = 250) -> list[dict[str, Any]]:
+        """Get all categories (flat list)."""
+        return self._get_paginated("catalog/categories", limit=limit)
+
+    # -------------------------------------------------------------------------
     # Variants
     # -------------------------------------------------------------------------
 

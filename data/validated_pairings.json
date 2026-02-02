@@ -1,0 +1,47 @@
+[
+  {
+    "source_category": "Tactical Pants",
+    "target_category": "Tactical Belts",
+    "valid": true,
+    "confidence": 0.86,
+    "reason": "Tactical/duty pants are typically worn with a belt, and many law enforcement/military users need a duty/rigger or inner/outer belt system to support holsters, pouches, and other load-bearing gear. This is a practical same-job-function pairing that helps complete the uniform/kit.",
+    "relationship_type": "complementary",
+    "suggested_weight": 68
+  },
+  {
+    "source_category": "Fire Helmets",
+    "target_category": "Helmet Accessories",
+    "valid": true,
+    "confidence": 0.92,
+    "reason": "Helmet accessories (face shields, goggles, helmet lights, nomex covers, chin straps) are directly used with fire/rescue helmets in the same operational context and are often required for protection, visibility, retention, or compliance. Customers purchasing a fire helmet commonly need at least one of these to complete the helmet setup or replace worn components.",
+    "relationship_type": "accessory",
+    "suggested_weight": 78
+  },
+  {
+    "source_category": "Radios",
+    "target_category": "Radio Straps",
+    "valid": true,
+    "confidence": 0.92,
+    "reason": "Radio straps are a common required accessory for carrying/retaining portable radios in the field (law enforcement, fire/EMS, industrial safety). Customers buying radios often need a strap for hands-free use, quick access, and to prevent drops/loss.",
+    "relationship_type": "accessory",
+    "suggested_weight": 68
+  },
+  {
+    "source_category": "Fire Helmets",
+    "target_category": "Gun Magazines",
+    "valid": false,
+    "confidence": 0.97,
+    "reason": "Fire helmets are for firefighting/rescue operations, while gun magazines are law-enforcement/military firearm accessories. They are not used together in the same job function and a customer purchasing a fire helmet would not typically need gun magazines as a required or practical add-on.",
+    "relationship_type": "unrelated",
+    "suggested_weight": 3
+  },
+  {
+    "source_category": "Tactical Boots",
+    "target_category": "Boot Socks",
+    "valid": true,
+    "confidence": 0.92,
+    "reason": "Tactical/duty socks are a direct complementary item to tactical boots in the same job functions (law enforcement, military, industrial). Customers buying boots typically also need appropriate moisture-wicking, cushioned socks for comfort, blister prevention, and performance during long shifts.",
+    "relationship_type": "complementary",
+    "suggested_weight": 68
+  }
+]
