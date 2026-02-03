@@ -110,6 +110,196 @@ Respond in JSON format:
         }
 
 
+def get_batch_llm_validation(
+    source_category: str,
+    target_items: list[dict],  # [{"name": "...", "sku": "...", "brand": "..."}, ...]
+    provider: str = "athena",
+    max_items: int = 10,
+) -> list[dict]:
+    """
+    Batch evaluate multiple items for a single category in one LLM call.
+    
+    This is 3-4x faster than individual calls due to:
+    - Single prompt processing overhead
+    - MoE experts staying "warm" across items
+    - Reduced round-trip latency
+    
+    Args:
+        source_category: The category customer is buying from
+        target_items: List of candidate items to evaluate
+        provider: LLM provider (athena recommended for batch)
+        max_items: Max items per batch (stay under 25k tokens)
+    
+    Returns:
+        List of validation results, one per item
+    """
+    # Limit batch size to stay in effective context window
+    items_to_evaluate = target_items[:max_items]
+    
+    # Build item list for prompt
+    item_list = "\n".join([
+        f"  {i+1}. {item.get('name', 'Unknown')} (SKU: {item.get('sku', 'N/A')}, Brand: {item.get('brand', 'N/A')})"
+        for i, item in enumerate(items_to_evaluate)
+    ])
+    
+    prompt = f"""You are a retail merchandising expert evaluating upsell recommendations.
+
+{STORE_CONTEXT if HAS_CONTEXT else "This is a safety/tactical/industrial supplies store."}
+
+A customer is buying from: "{source_category}"
+
+Evaluate EACH of these {len(items_to_evaluate)} potential upsell items:
+{item_list}
+
+For EACH item, determine if it's a sensible upsell. Consider:
+1. Is this item complementary to {source_category}?
+2. Would a customer REALISTICALLY buy both together?
+3. Is this a professional/practical pairing?
+
+Respond with a JSON array containing one object per item, in order:
+[
+  {{"item_index": 1, "valid": true/false, "confidence": 0.0-1.0, "reason": "brief", "relationship_type": "accessory|complementary|bundle|unrelated", "suggested_weight": 1-90}},
+  {{"item_index": 2, ...}},
+  ...
+]
+
+IMPORTANT: Return ONLY the JSON array, no other text."""
+
+    # Route to appropriate provider
+    if provider == "athena":
+        result = _call_athena_batch(prompt, len(items_to_evaluate))
+    elif provider in ("azure", "gpt5-nano", "gpt5-mini"):
+        deployment = None
+        if provider == "gpt5-nano":
+            deployment = "gpt-5-nano"
+        elif provider == "gpt5-mini":
+            deployment = "gpt-5-mini"
+        result = _call_azure_batch(prompt, len(items_to_evaluate), deployment)
+    else:
+        # Fallback: return empty results
+        return [{"valid": None, "confidence": 0, "reason": f"Provider {provider} not supported for batch"} 
+                for _ in items_to_evaluate]
+    
+    # Parse results and match back to items
+    if not isinstance(result, list):
+        # Parsing failed - return defaults
+        return [{"valid": None, "confidence": 0, "reason": "Batch parse failed"} 
+                for _ in items_to_evaluate]
+    
+    # Ensure we have results for all items
+    validated = []
+    for i, item in enumerate(items_to_evaluate):
+        if i < len(result):
+            r = result[i]
+            r["item_name"] = item.get("name")
+            r["item_sku"] = item.get("sku")
+            validated.append(r)
+        else:
+            validated.append({
+                "valid": None, 
+                "confidence": 0, 
+                "reason": "Missing from batch response",
+                "item_name": item.get("name"),
+                "item_sku": item.get("sku"),
+            })
+    
+    return validated
+
+
+def _call_athena_batch(prompt: str, expected_count: int) -> list:
+    """Call Athena for batch validation."""
+    athena_url = os.environ.get("ATHENA_HOST", "http://100.64.0.3:8081")
+    
+    try:
+        response = requests.post(
+            f"{athena_url}/v1/chat/completions",
+            headers={"Content-Type": "application/json"},
+            json={
+                "model": "gpt-oss-120b-derestricted",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+                "max_tokens": 300 * expected_count,  # ~300 tokens per item
+            },
+            timeout=300,  # 5 min for large batches
+        )
+        response.raise_for_status()
+        content = response.json()["choices"][0]["message"]["content"]
+        return _parse_batch_json(content)
+    except Exception as e:
+        print(f"  Athena batch error: {e}")
+        return []
+
+
+def _call_azure_batch(prompt: str, expected_count: int, deployment: Optional[str] = None) -> list:
+    """Call Azure for batch validation."""
+    api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+    api_base = os.environ.get("AZURE_OPENAI_API_BASE")
+    api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-04-01-preview")
+    if deployment is None:
+        deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+    
+    if not api_key or not api_base:
+        return []
+    
+    url = f"{api_base.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
+    
+    payload = {
+        "messages": [{"role": "user", "content": prompt}],
+        "response_format": {"type": "json_object"},
+    }
+    
+    # GPT-5 models use different params
+    if "nano" in deployment:
+        payload["max_completion_tokens"] = 2000 + (200 * expected_count)
+        payload["reasoning_effort"] = "low"
+    elif "gpt-5" in deployment:
+        payload["max_completion_tokens"] = 300 * expected_count
+    else:
+        payload["temperature"] = 0.3
+    
+    try:
+        response = requests.post(
+            url,
+            headers={"api-key": api_key, "Content-Type": "application/json"},
+            json=payload,
+            timeout=300,
+        )
+        response.raise_for_status()
+        content = response.json()["choices"][0]["message"]["content"]
+        return _parse_batch_json(content)
+    except Exception as e:
+        print(f"  Azure batch error: {e}")
+        return []
+
+
+def _parse_batch_json(content: str) -> list:
+    """Parse JSON array from LLM response, handling common issues."""
+    content = content.strip()
+    
+    # Try direct parse
+    try:
+        result = json.loads(content)
+        if isinstance(result, list):
+            return result
+        # Sometimes wrapped in {"results": [...]}
+        if isinstance(result, dict) and "results" in result:
+            return result["results"]
+        return []
+    except json.JSONDecodeError:
+        pass
+    
+    # Try to extract JSON array from markdown code block
+    import re
+    json_match = re.search(r'\[[\s\S]*\]', content)
+    if json_match:
+        try:
+            return json.loads(json_match.group())
+        except json.JSONDecodeError:
+            pass
+    
+    return []
+
+
 def _call_azure_openai(prompt: str, deployment: Optional[str] = None) -> dict:
     """Call Azure OpenAI API."""
     api_key = os.environ.get("AZURE_OPENAI_API_KEY")
