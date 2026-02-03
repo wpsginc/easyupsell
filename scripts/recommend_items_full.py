@@ -148,28 +148,39 @@ def get_high_value_items_with_sales(
     item_sales: dict,
     product_categories: dict,
     limit: int = 300,
+    priority_brands: list[str] = None,
 ) -> list[dict]:
     """
     Get high-value items that make good upsell candidates.
     Include sales data for each item.
+    Priority brands are boosted to ensure inclusion.
     """
+    # Known high-performing add-on brands
+    priority_brands = priority_brands or [
+        "streamlight", "benchmade", "channellock", "pelican", 
+        "gerber", "leatherman", "5.11", "blackinton"
+    ]
+    
     print("Fetching high-value item candidates...")
     
-    products = bc_client.get_products(limit=1000)
+    products = bc_client.get_products(limit=2000)  # Get more products
     
-    candidates = []
+    priority_items = []
+    regular_items = []
+    
     for p in products:
         price = float(p.get("price", 0) or 0)
         product_id = p["id"]
+        name = p.get("name", "")
         
         # Good upsell = $15-200, visible
         if 15 <= price <= 200 and p.get("is_visible", True):
             sales = item_sales.get(product_id, {})
             
-            candidates.append({
+            item = {
                 "id": product_id,
                 "sku": p.get("sku", ""),
-                "name": p.get("name", "")[:60],
+                "name": name[:60],
                 "price": price,
                 "categories": p.get("categories", []),
                 "inventory": p.get("inventory_level", 0),
@@ -177,13 +188,30 @@ def get_high_value_items_with_sales(
                 "order_count": sales.get("order_count", 0),
                 "units_sold": sales.get("units_sold", 0),
                 "revenue": round(sales.get("revenue", 0), 2),
-            })
+            }
+            
+            # Check if priority brand
+            name_lower = name.lower()
+            is_priority = any(brand in name_lower for brand in priority_brands)
+            
+            if is_priority:
+                priority_items.append(item)
+            else:
+                regular_items.append(item)
     
-    # Sort by sales (proven sellers first), then by price sweet spot
-    candidates.sort(key=lambda x: (-x["order_count"], abs(x["price"] - 50)))
+    # Sort each by sales
+    priority_items.sort(key=lambda x: (-x["order_count"], abs(x["price"] - 50)))
+    regular_items.sort(key=lambda x: (-x["order_count"], abs(x["price"] - 50)))
     
-    print(f"  Found {len(candidates)} upsell candidates ($15-$200)")
-    return candidates[:limit]
+    # Ensure priority brands are included (at least 50% of limit)
+    priority_limit = min(len(priority_items), limit // 2)
+    regular_limit = limit - priority_limit
+    
+    candidates = priority_items[:priority_limit] + regular_items[:regular_limit]
+    
+    print(f"  Found {len(priority_items)} priority brand items, {len(regular_items)} regular")
+    print(f"  Selected: {priority_limit} priority + {regular_limit} regular = {len(candidates)}")
+    return candidates
 
 
 def find_recommendations_for_category(
@@ -195,45 +223,52 @@ def find_recommendations_for_category(
 ) -> list[dict]:
     """
     Find best item recommendations for a category.
-    - Items NOT in same category (cross-sell)
-    - Prioritize proven sellers
-    - LLM validates
+    - Prioritize proven sellers (high order count)
+    - Allow items that share categories (flashlights in Helmets are still good cross-sells)
+    - LLM validates the pairing
     """
     category_id = category["id"]
     category_name = category["name"]
+    category_name_lower = category_name.lower()
     
-    # Items NOT in this category
-    cross_sell_items = [
-        item for item in all_items 
-        if category_id not in item["categories"]
-    ]
+    # Filter items - exclude only if item IS the exact category being shopped
+    # e.g., don't recommend "Helmets" product to someone in "Helmets" category
+    # BUT DO recommend "Flashlights" even if they're also tagged in "Helmets"
+    eligible_items = []
+    for item in all_items:
+        item_name_lower = item["name"].lower()
+        
+        # Skip if item name contains the category name (same product type)
+        if category_name_lower in item_name_lower:
+            continue
+        
+        # Skip if category name contains the item type (e.g., "Helmets" category, "Helmet" item)
+        item_type = item_name_lower.split()[0] if item_name_lower else ""
+        if len(item_type) > 4 and item_type in category_name_lower:
+            continue
+            
+        eligible_items.append(item)
     
-    # Sample from diverse categories, prioritize items with sales
-    seen_cats = set()
-    diverse_items = []
+    # Sort by sales (proven sellers first)
+    eligible_items.sort(key=lambda x: -x.get("order_count", 0))
     
-    # First pass: items with sales
-    for item in cross_sell_items:
-        if item["order_count"] > 0:
-            item_cats = tuple(sorted(item["categories"]))
-            if item_cats not in seen_cats:
-                diverse_items.append(item)
-                seen_cats.add(item_cats)
-                if len(diverse_items) >= max_items:
-                    break
+    # Pick top sellers with diversity
+    selected = []
+    seen_names = set()  # Avoid duplicates by name prefix
     
-    # Second pass: fill with any items
-    for item in cross_sell_items:
-        item_cats = tuple(sorted(item["categories"]))
-        if item_cats not in seen_cats:
-            diverse_items.append(item)
-            seen_cats.add(item_cats)
-            if len(diverse_items) >= max_items:
-                break
+    for item in eligible_items:
+        # Unique by first 3 words of name
+        name_key = " ".join(item["name"].lower().split()[:3])
+        if name_key in seen_names:
+            continue
+        seen_names.add(name_key)
+        selected.append(item)
+        if len(selected) >= max_items:
+            break
     
     # Validate each with LLM
     recommendations = []
-    for item in diverse_items[:max_items]:
+    for item in selected:
         try:
             result = get_llm_validation(category_name, item["name"], provider=provider)
         except Exception as e:
