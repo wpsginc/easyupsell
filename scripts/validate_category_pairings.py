@@ -87,6 +87,10 @@ Respond in JSON format:
 
     if provider == "azure":
         return _call_azure_openai(prompt)
+    elif provider == "gpt5-nano":
+        return _call_azure_openai(prompt, deployment="gpt-5-nano")
+    elif provider == "gpt5-mini":
+        return _call_azure_openai(prompt, deployment="gpt-5-mini")
     elif provider == "openai":
         return _call_openai(prompt)
     elif provider == "ollama":
@@ -106,12 +110,13 @@ Respond in JSON format:
         }
 
 
-def _call_azure_openai(prompt: str) -> dict:
+def _call_azure_openai(prompt: str, deployment: Optional[str] = None) -> dict:
     """Call Azure OpenAI API."""
     api_key = os.environ.get("AZURE_OPENAI_API_KEY")
     api_base = os.environ.get("AZURE_OPENAI_API_BASE")
     api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-04-01-preview")
-    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+    if deployment is None:
+        deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
     
     if not api_key or not api_base:
         return {"valid": None, "confidence": 0, "reason": "Azure OpenAI not configured"}
