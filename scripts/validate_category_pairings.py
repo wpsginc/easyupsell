@@ -124,17 +124,31 @@ def _call_azure_openai(prompt: str, deployment: Optional[str] = None) -> dict:
     # Azure OpenAI endpoint format
     url = f"{api_base.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
     
+    # GPT-5 models use max_completion_tokens instead of max_tokens
+    # GPT-5-nano doesn't support temperature parameter
+    payload = {
+        "messages": [{"role": "user", "content": prompt}],
+        "response_format": {"type": "json_object"},
+    }
+    
+    # Add appropriate token limit based on model
+    # GPT-5-nano is a reasoning model - needs ~1400 tokens for thinking + output
+    if "nano" in deployment:
+        payload["max_completion_tokens"] = 2000  # Reasoning models need a lot more
+    elif "gpt-5" in deployment or "gpt-oss" in deployment:
+        payload["max_completion_tokens"] = 300
+    
+    # Only add temperature for models that support it (not nano)
+    if "nano" not in deployment:
+        payload["temperature"] = 0.3
+    
     response = requests.post(
         url,
         headers={
             "api-key": api_key,
             "Content-Type": "application/json",
         },
-        json={
-            "messages": [{"role": "user", "content": prompt}],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.3,
-        },
+        json=payload,
         timeout=60,
     )
     response.raise_for_status()
