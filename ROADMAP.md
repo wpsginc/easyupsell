@@ -59,6 +59,9 @@ easyupsell brands --list
   easyupsell analyze --item "STR-69140"  # Find upsells for a specific product
   easyupsell analyze --top-items 100     # Analyze top 100 products by sales
   ```
+- [ ] **@Dave: Set up cheaper model** - DeepSeek V3 ($0.14/1M) or GPT-4o-mini
+  - Current: gpt-5.2 (massive overkill for yes/no classification)
+  - Add `--cheap` flag for bulk runs
 
 ---
 
