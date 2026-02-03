@@ -27,7 +27,7 @@ from bigcommerce import BigCommerceClient
 
 # Import LLM validation
 sys.path.insert(0, str(Path(__file__).parent))
-from validate_category_pairings import get_llm_validation
+from validate_category_pairings import get_llm_validation, get_batch_llm_validation
 
 
 def get_order_data(bc_client: BigCommerceClient, months: int = 6) -> tuple[dict, dict, dict]:
@@ -266,13 +266,27 @@ def find_recommendations_for_category(
         if len(selected) >= max_items:
             break
     
-    # Validate each with LLM
+    # Validate with LLM in batch (much faster - single prompt processing)
+    batch_items = [
+        {"name": item["name"], "sku": item.get("sku", ""), "brand": item.get("brand", "")}
+        for item in selected
+    ]
+    
+    try:
+        batch_results = get_batch_llm_validation(
+            category_name, 
+            batch_items, 
+            provider=provider,
+            max_items=50,  # Process up to 50 at a time
+        )
+    except Exception as e:
+        print(f"    Batch validation error: {e}")
+        batch_results = [{"valid": None, "reason": f"Batch error: {e}"} for _ in selected]
+    
+    # Build recommendations from batch results
     recommendations = []
-    for item in selected:
-        try:
-            result = get_llm_validation(category_name, item["name"], provider=provider)
-        except Exception as e:
-            result = {"valid": None, "reason": f"Error: {e}"}
+    for i, item in enumerate(selected):
+        result = batch_results[i] if i < len(batch_results) else {"valid": None}
         
         # Get item's category names
         item_cat_names = [id_to_name.get(c, "") for c in item["categories"][:2]]
@@ -300,8 +314,6 @@ def find_recommendations_for_category(
             "relationship_type": result.get("relationship_type", ""),
             "llm_reason": result.get("reason", ""),
         })
-        
-        sleep(0.1)
     
     return recommendations
 
@@ -352,24 +364,7 @@ def main():
     # Get high-value items
     high_value_items = get_high_value_items_with_sales(client, item_sales, product_categories, limit=300)
     
-    # Generate recommendations
-    all_recommendations = []
-    
-    for i, cat in enumerate(top_categories):
-        print(f"\n[{i+1}/{len(top_categories)}] {cat['name']} ({cat['order_count']} orders)")
-        
-        recs = find_recommendations_for_category(
-            cat, high_value_items, id_to_name,
-            provider=args.provider,
-            max_items=args.items_per_category,
-        )
-        
-        valid_count = sum(1 for r in recs if r["llm_valid"])
-        print(f"  → {valid_count}/{len(recs)} valid recommendations")
-        
-        all_recommendations.extend(recs)
-    
-    # Save
+    # Prepare output file - write header first
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
@@ -380,17 +375,35 @@ def main():
         "llm_valid", "llm_confidence", "relationship_type", "llm_reason",
     ]
     
+    # Write header
     with open(output_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
+    
+    # Generate recommendations and write incrementally
+    all_recommendations = []
+    
+    for i, cat in enumerate(top_categories):
+        print(f"\n[{i+1}/{len(top_categories)}] {cat['name']} ({cat['order_count']} orders)")
+        sys.stdout.flush()
         
-        # Sort: valid first, then by source orders (high traffic), then by item orders (proven)
-        for r in sorted(all_recommendations, key=lambda x: (
-            -int(x.get("llm_valid") or 0),
-            -x.get("src_orders_6mo", 0),
-            -x.get("item_orders_6mo", 0),
-        )):
-            writer.writerow(r)
+        recs = find_recommendations_for_category(
+            cat, high_value_items, id_to_name,
+            provider=args.provider,
+            max_items=args.items_per_category,
+        )
+        
+        valid_count = sum(1 for r in recs if r["llm_valid"])
+        print(f"  → {valid_count}/{len(recs)} valid recommendations")
+        sys.stdout.flush()
+        
+        # Append to CSV immediately
+        with open(output_path, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            for r in recs:
+                writer.writerow(r)
+        
+        all_recommendations.extend(recs)
     
     # Summary
     valid = [r for r in all_recommendations if r.get("llm_valid")]
