@@ -49,11 +49,16 @@ easyupsell brands --list
 | `config` | Configure API keys, LLM provider |
 | `status` | Show analysis progress/stats |
 
-### 1.3 Fixes Needed
+### 1.3 Fixes & Features Needed
 - [ ] Allow same-category recommendations (helmet→helmet light)
 - [ ] Resume capability for interrupted runs
 - [ ] Progress bar for large batches
 - [ ] Local caching of category/product data
+- [ ] **Item-level analysis** (item→item, not just category→item)
+  ```bash
+  easyupsell analyze --item "STR-69140"  # Find upsells for a specific product
+  easyupsell analyze --top-items 100     # Analyze top 100 products by sales
+  ```
 
 ---
 
