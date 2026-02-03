@@ -93,6 +93,8 @@ Respond in JSON format:
         return _call_ollama(prompt)
     elif provider == "litellm":
         return _call_litellm(prompt)
+    elif provider == "athena":
+        return _call_athena(prompt)
     else:
         # Default: return uncertain
         return {
@@ -198,6 +200,53 @@ def _call_litellm(prompt: str) -> dict:
     response.raise_for_status()
     
     content = response.json()["choices"][0]["message"]["content"]
+    return json.loads(content)
+
+
+def _call_athena(prompt: str) -> dict:
+    """Call GPT-OSS 120B on Athena (local inference, FREE!)."""
+    athena_host = os.environ.get("ATHENA_HOST", "http://100.64.0.3:8081")
+    
+    # Simplified prompt for better JSON response
+    simple_prompt = f"""{prompt}
+
+CRITICAL: Output ONLY valid JSON with these exact fields:
+{{"valid": true/false, "confidence": 0.0-1.0, "reason": "one line", "relationship_type": "accessory|complementary|unrelated", "suggested_weight": 50}}"""
+    
+    # GPT-OSS uses OpenAI-compatible API
+    response = requests.post(
+        f"{athena_host}/v1/chat/completions",
+        headers={"Content-Type": "application/json"},
+        json={
+            "model": "gpt-oss-120b",
+            "messages": [{"role": "user", "content": simple_prompt}],
+            "temperature": 0.3,
+            "max_tokens": 300,  # Needs room for reasoning + output
+        },
+        timeout=180,  # Local model can be slower
+    )
+    response.raise_for_status()
+    
+    msg = response.json()["choices"][0]["message"]
+    content = msg.get("content", "")
+    
+    # GPT-OSS might put reasoning in separate field, content has the answer
+    if not content and msg.get("reasoning_content"):
+        # Model still thinking, try extracting from reasoning
+        content = msg.get("reasoning_content", "")
+    
+    # Find JSON in the response
+    import re
+    json_match = re.search(r'\{[^{}]*"valid"[^{}]*\}', content, re.DOTALL)
+    if json_match:
+        return json.loads(json_match.group())
+    
+    # Try to parse the whole content as JSON
+    content = content.strip()
+    if content.startswith("```"):
+        lines = content.split("\n")
+        content = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+    
     return json.loads(content)
 
 
