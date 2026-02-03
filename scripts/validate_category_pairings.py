@@ -135,6 +135,7 @@ def _call_azure_openai(prompt: str, deployment: Optional[str] = None) -> dict:
     # GPT-5-nano is a reasoning model - needs ~1400 tokens for thinking + output
     if "nano" in deployment:
         payload["max_completion_tokens"] = 2000  # Reasoning models need a lot more
+        payload["reasoning_effort"] = "low"  # Minimize the evil internal monologue
     elif "gpt-5" in deployment or "gpt-oss" in deployment:
         payload["max_completion_tokens"] = 300
     

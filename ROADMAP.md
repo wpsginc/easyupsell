@@ -62,6 +62,10 @@ easyupsell brands --list
 - [ ] **@Dave: Set up cheaper model** - DeepSeek V3 ($0.14/1M) or GPT-4o-mini
   - Current: gpt-5.2 (massive overkill for yes/no classification)
   - Add `--cheap` flag for bulk runs
+- [ ] **Batched LLM calls** - 8-10 items per prompt (50-70% faster!)
+  - Stay under 25k tokens (quant drops off after 32k)
+  - Single category → batch all candidate items in one call
+  - Return JSON array of results
 
 ---
 
