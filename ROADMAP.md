@@ -1,7 +1,11 @@
 # EasyUpsell Product Roadmap
 
+**Status:** ⚠️ Needs Fixes (BQ category query + NS ID missing)
+
+> ⚠️ **RENAME PENDING**: This project will be renamed to **PRE (Product Recommendation Engine)** - see Phase 5 below.
+
 ## Vision
-A CLI-first upsell recommendation engine for BigCommerce stores. Uses LLM validation + business metrics to generate high-quality category→item pairings for checkout upsells.
+A **decision-support tool** for product recommendations. Uses LLM validation + enriched business metrics (copurchase frequency, margins, velocity) to surface high-quality upsell candidates for **human review and approval**. The goal is to remove drudgery, not replace human judgment.
 
 ---
 
@@ -144,6 +148,36 @@ easyupsell brands --list
 | APIs | BigCommerce V3, NetSuite SuiteQL |
 | TUI | Textual (Python) |
 | Web | FastAPI + React |
+
+---
+
+## Phase 5: Rename & Service API (Future)
+
+### 5.1 Project Rename
+- [ ] Rename folder from `easyupsell/` → `pre/` (Product Recommendation Engine)
+- [ ] Update all imports, CLI commands, docs
+- [ ] New CLI: `pre analyze`, `pre review`, `pre export`
+
+### 5.2 Service API for LibrePIM Integration
+- [ ] REST API endpoint: `GET /recommendations/{product_id}`
+- [ ] Nightly/weekly batch job populates recommendation cache
+- [ ] LibrePIM queries PRE for upsell candidates
+- [ ] Human-in-the-loop approval workflow in PIM UI
+
+### 5.3 NetSuite Integration (Nightly Push)
+- [ ] Create custom record type in NetSuite for recommendations
+- [ ] Nightly job pushes approved recommendations to NS via SuiteQL/REST
+- [ ] Push model preferred (secure, behind firewall, NS auth already solved)
+- [ ] Display in NS for users who live there (senior architect request)
+
+### 5.4 Critical Data Requirement: NetSuite ID
+- [ ] Extract NetSuite Internal ID from BigCommerce `bin_picking_number` field
+- [ ] BPN is comma-delimited; NS ID is always the **first value**
+- [ ] Include `netsuite_id` in all recommendation output
+- [ ] This is the **UID across all systems**: PIM, NS, CA, BC
+
+### 5.5 Philosophy
+PRE is a **decision-support tool**, not an autonomous agent. AI surfaces candidates + enriched data; humans make final calls based on business context.
 
 ---
 

@@ -139,10 +139,35 @@ def get_batch_llm_validation(
     items_to_evaluate = target_items[:max_items]
     
     # Build item list for prompt
-    item_list = "\n".join([
-        f"  {i+1}. {item.get('name', 'Unknown')} (SKU: {item.get('sku', 'N/A')}, Brand: {item.get('brand', 'N/A')})"
-        for i, item in enumerate(items_to_evaluate)
-    ])
+    item_lines = []
+    for i, item in enumerate(items_to_evaluate):
+        base_line = f"  {i+1}. {item.get('name', 'Unknown')}"
+        details = []
+        
+        if item.get('sku'):
+            details.append(f"SKU: {item['sku']}")
+        if item.get('brand'):
+            details.append(f"Brand: {item['brand']}")
+        if item.get('price'):
+            details.append(f"Price: ${item['price']}")
+            
+        # Enriched Data
+        if item.get('copurchase_text'):
+            details.append(item['copurchase_text'])
+        if item.get('margin_pct'):
+            details.append(f"Gross Margin: {float(item['margin_pct'])*100:.1f}%")
+        if item.get('velocity_text'):
+            details.append(item['velocity_text'])
+        if item.get('inventory_text'):
+            details.append(item['inventory_text'])
+            
+        # Combine
+        if details:
+            item_lines.append(f"{base_line}\n     - " + "\n     - ".join(details))
+        else:
+            item_lines.append(base_line)
+
+    item_list = "\n".join(item_lines)
     
     prompt = f"""You are a retail merchandising expert evaluating upsell recommendations.
 

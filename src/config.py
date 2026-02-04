@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     BC_STORE_HASH: Optional[str] = Field(None, alias="BIGCOMMERCE_STORE_HASH")
     BC_ACCESS_TOKEN: Optional[str] = Field(None, alias="BIGCOMMERCE_ACCESS_TOKEN")
     
+    # BigQuery
+    BQ_PROJECT_ID: Optional[str] = Field(None, alias="GOOGLE_CLOUD_PROJECT")
+    
     # LLM Provider Configuration
     DEFAULT_PROVIDER: str = "azure"
     

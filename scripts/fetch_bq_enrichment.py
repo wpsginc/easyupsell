@@ -53,7 +53,7 @@ SELECT
   COALESCE(ps.margin_pct, 0.0) AS rec_margin,
   p.sku AS rec_sku,
   p.product_name AS rec_name,
-  SPLIT(p.bin_picking_number, ',')[OFFSET(0)] AS rec_netsuite_id
+  p.bin_picking_number AS rec_bpn
 FROM copurchase c
 JOIN `bc_native.bc_product` p_source ON c.source_id = p_source.product_id
 LEFT JOIN product_stats ps ON c.rec_id = ps.product_id
@@ -93,7 +93,7 @@ SELECT
   COALESCE(ps.margin_pct, 0.0) AS rec_margin,
   p.sku AS rec_sku,
   p.product_name AS rec_name,
-  SPLIT(p.bin_picking_number, ',')[OFFSET(0)] AS rec_netsuite_id
+  p.bin_picking_number AS rec_bpn
 FROM category_copurchase cc
 LEFT JOIN product_stats ps ON cc.rec_id = ps.product_id
 JOIN `bc_native.bc_product` p ON cc.rec_id = p.product_id
@@ -117,10 +117,18 @@ def main():
     df_item = client.run_query(QUERY_ITEM_ITEM)
     print(f"  Rows: {len(df_item)}")
     
+    # Process NetSuite IDs in Python for logging
+    print("  Extracting NetSuite IDs...")
+    df_item['rec_netsuite_id'] = df_item['rec_bpn'].apply(BigQueryClient.extract_netsuite_id)
+    
     # 2. Fetch Category-Item
     print("\nFetching Category-Item Co-occurrence...")
     df_cat = client.run_query(QUERY_CATEGORY_ITEM)
     print(f"  Rows: {len(df_cat)}")
+    
+    # Process NetSuite IDs in Python for logging
+    print("  Extracting NetSuite IDs...")
+    df_cat['rec_netsuite_id'] = df_cat['rec_bpn'].apply(BigQueryClient.extract_netsuite_id)
 
     # 3. Structure Data
     output_data = {

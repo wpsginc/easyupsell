@@ -1,7 +1,10 @@
 from typing import Optional
+import logging
 import pandas as pd
 from google.cloud import bigquery
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 class BigQueryClient:
     """
@@ -14,13 +17,17 @@ class BigQueryClient:
         Initialize the BigQuery client.
         
         Args:
-            project_id: GCP Project ID. Defaults to settings.BQ_PROJECT_ID.
+            project_id: GCP Project ID. If None, tries settings.BQ_PROJECT_ID, 
+                       then falls back to ADC default.
         """
         self.project_id = project_id or settings.BQ_PROJECT_ID
-        if not self.project_id:
-            raise ValueError("BQ_PROJECT_ID is not set in configuration.")
-            
+        
+        # If project_id is still None, Client() will attempt to infer it from ADC
         self.client = bigquery.Client(project=self.project_id)
+        
+        # Update project_id with the resolved one
+        if not self.project_id:
+            self.project_id = self.client.project
 
     def run_query(self, sql: str) -> pd.DataFrame:
         """
@@ -40,7 +47,18 @@ class BigQueryClient:
         """
         Extract NetSuite Internal ID from the Bin Picking Number (BPN) field.
         The BPN is often comma-separated; the ID is the first value.
+        Logs a WARNING if missing or malformed.
         """
-        if not bpn:
+        if not bpn or not bpn.strip():
+            logger.warning("NetSuite ID missing or empty in BPN field")
             return None
-        return bpn.split(",")[0].strip()
+        
+        try:
+            ns_id = bpn.split(",")[0].strip()
+            if not ns_id:
+                logger.warning(f"NetSuite ID extraction failed for BPN: {bpn}")
+                return None
+            return ns_id
+        except Exception as e:
+            logger.warning(f"Error extracting NetSuite ID from BPN '{bpn}': {e}")
+            return None

@@ -3,8 +3,9 @@
 BigCommerce Order Co-occurrence Analysis
 
 Analyzes BigCommerce order history to find products frequently purchased together.
-Works with sparse data by also identifying single-item orders that COULD benefit
-from cross-sell recommendations.
+Generates two types of co-occurrence data:
+1. Item-Item: "People who bought Item A also bought Item B"
+2. Category-Item: "People who bought from Category X also bought Item Y"
 
 Usage:
     python scripts/analyze_bc_orders.py
@@ -26,13 +27,36 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from bigcommerce import BigCommerceClient
 
 
-def get_order_data(client: BigCommerceClient, months: int = 12) -> tuple[list[dict], dict]:
+def prefetch_product_categories(client: BigCommerceClient) -> tuple[dict[int, list[int]], dict[int, str]]:
+    """
+    Fetch all products to map Product ID -> Category IDs and Product ID -> SKU.
+    """
+    print("Prefetching product catalog...")
+    products = client.get_products(limit=250)
+    
+    product_categories = {}
+    product_skus = {}
+    
+    for p in products:
+        pid = p.get("id")
+        sku = p.get("sku")
+        categories = p.get("categories", [])
+        
+        if pid and sku:
+            product_categories[pid] = categories
+            product_skus[pid] = sku
+            
+    print(f"Loaded {len(product_categories)} products from catalog.")
+    return product_categories, product_skus
+
+
+def get_order_data(client: BigCommerceClient, months: int = 12) -> tuple[list[dict], list[dict]]:
     """
     Fetch orders and their products from BigCommerce.
     
     Returns:
-        - List of order summaries
-        - Dict mapping order_id to list of product SKUs
+        - List of single-item order summaries (cross-sell gaps)
+        - List of multi-item order details (list of {sku, product_id} dicts per order)
     """
     # Calculate date range
     min_date = datetime.now() - timedelta(days=months * 30)
@@ -46,26 +70,28 @@ def get_order_data(client: BigCommerceClient, months: int = 12) -> tuple[list[di
     
     print(f"Found {len(orders)} orders")
     
-    order_products = {}
     single_item_orders = []
-    multi_item_orders = []
+    multi_item_orders_details = []
     
     for i, order in enumerate(orders):
         order_id = order.get("id")
         
         try:
             products = client.get_order_products(order_id)
-            skus = [p.get("sku") for p in products if p.get("sku")]
+            # Filter out items without SKU or ID
+            valid_products = [
+                {"sku": p.get("sku"), "product_id": p.get("product_id"), "name": p.get("name")}
+                for p in products if p.get("sku") and p.get("product_id")
+            ]
             
-            if len(skus) == 1:
+            if len(valid_products) == 1:
                 single_item_orders.append({
                     "order_id": order_id,
-                    "sku": skus[0],
-                    "product_name": products[0].get("name"),
+                    "sku": valid_products[0]["sku"],
+                    "product_name": valid_products[0]["name"],
                 })
-            elif len(skus) > 1:
-                multi_item_orders.append({"order_id": order_id, "skus": skus})
-                order_products[order_id] = set(skus)
+            elif len(valid_products) > 1:
+                multi_item_orders_details.append(valid_products)
             
             if (i + 1) % 50 == 0:
                 print(f"  Processed {i + 1}/{len(orders)} orders...")
@@ -76,42 +102,107 @@ def get_order_data(client: BigCommerceClient, months: int = 12) -> tuple[list[di
     
     print(f"\nOrder breakdown:")
     print(f"  Single-item orders: {len(single_item_orders)} (cross-sell opportunities)")
-    print(f"  Multi-item orders: {len(multi_item_orders)} (co-occurrence data)")
+    print(f"  Multi-item orders: {len(multi_item_orders_details)} (co-occurrence data)")
     
-    return single_item_orders, order_products
+    return single_item_orders, multi_item_orders_details
 
 
-def analyze_cooccurrence(order_products: dict[int, set[str]], min_count: int = 2) -> list[dict]:
-    """Calculate which products are bought together."""
-    pair_counts = defaultdict(int)
-    total_orders = len(order_products)
+def analyze_cooccurrence(
+    multi_item_orders: list[list[dict]],
+    product_categories: dict[int, list[int]],
+    min_count: int = 2
+) -> dict[str, list]:
+    """
+    Calculate which products are bought together (Item-Item) 
+    and which items are bought with categories (Category-Item).
+    """
+    item_pair_counts = defaultdict(int)
+    category_item_counts = defaultdict(int)
+    total_orders = len(multi_item_orders)
     
-    for order_id, skus in order_products.items():
-        if len(skus) < 2:
-            continue
+    print("\nAnalyzing co-occurrence...")
+    
+    for order_items in multi_item_orders:
+        # Get unique SKUs and their categories in this order
+        # item structure: {'sku': '...', 'product_id': 123}
+        order_skus = set()
+        order_categories = set()
         
-        for pair in combinations(sorted(skus), 2):
-            pair_counts[pair] += 1
-    
-    results = []
-    for (sku_a, sku_b), count in pair_counts.items():
+        # Build maps for this specific order
+        sku_to_cats = {}
+        
+        for item in order_items:
+            sku = item["sku"]
+            pid = item["product_id"]
+            
+            # Skip if we don't have catalog data for this product (e.g. discontinued)
+            if pid not in product_categories:
+                continue
+                
+            cats = product_categories[pid]
+            sku_to_cats[sku] = cats
+            order_skus.add(sku)
+            for c in cats:
+                order_categories.add(c)
+        
+        sorted_skus = sorted(list(order_skus))
+        
+        # 1. Item-Item Co-occurrence
+        if len(sorted_skus) >= 2:
+            for pair in combinations(sorted_skus, 2):
+                item_pair_counts[pair] += 1
+                
+        # 2. Category-Item Co-occurrence
+        # For each item in the order, check if it co-occurred with a category
+        # (excluding its own categories to avoid self-matching)
+        for sku_target in sorted_skus:
+            # The categories of the target item
+            target_cats = set(sku_to_cats.get(sku_target, []))
+            
+            # The categories present in the REST of the order
+            other_cats = set()
+            for sku_other in sorted_skus:
+                if sku_other == sku_target:
+                    continue
+                other_cats.update(sku_to_cats.get(sku_other, []))
+            
+            # Increment count for each (Category -> Target Item)
+            for cat_id in other_cats:
+                category_item_counts[(cat_id, sku_target)] += 1
+
+    # Format Item-Item Results
+    item_results = []
+    for (sku_a, sku_b), count in item_pair_counts.items():
         if count >= min_count:
-            results.append({
-                "product_a": sku_a,
-                "product_b": sku_b,
+            item_results.append({
+                "item_a": sku_a,
+                "item_b": sku_b,
                 "count": count,
                 "support": round(count / total_orders, 6) if total_orders else 0,
             })
-    
-    results.sort(key=lambda x: x["count"], reverse=True)
-    return results
+    item_results.sort(key=lambda x: x["count"], reverse=True)
+
+    # Format Category-Item Results
+    category_results = []
+    for (cat_id, sku), count in category_item_counts.items():
+        if count >= min_count:
+            category_results.append({
+                "category_id": cat_id,
+                "item_sku": sku,
+                "count": count,
+                "support": round(count / total_orders, 6) if total_orders else 0,
+            })
+    category_results.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "item_cooccurrence": item_results,
+        "category_cooccurrence": category_results
+    }
 
 
 def identify_cross_sell_gaps(single_item_orders: list[dict]) -> list[dict]:
     """
     Identify products frequently bought alone (cross-sell opportunities).
-    
-    These are products where customers DIDN'T buy complementary items.
     """
     sku_counts = defaultdict(int)
     sku_names = {}
@@ -134,14 +225,14 @@ def identify_cross_sell_gaps(single_item_orders: list[dict]) -> list[dict]:
     return gaps
 
 
-def save_results(cooccurrence: list, gaps: list, output_dir: Path):
+def save_results(cooccurrence_data: dict, gaps: list, output_dir: Path):
     """Save analysis results."""
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Co-occurrence
-    if cooccurrence:
+    # Co-occurrence (Item-Item and Category-Item)
+    if cooccurrence_data:
         with open(output_dir / "bc_cooccurrence.json", "w") as f:
-            json.dump(cooccurrence, f, indent=2)
+            json.dump(cooccurrence_data, f, indent=2)
         print(f"Saved: {output_dir / 'bc_cooccurrence.json'}")
     
     # Cross-sell gaps
@@ -160,7 +251,7 @@ def main():
     parser.add_argument("--store", default="BC", help="Store prefix")
     args = parser.parse_args()
     
-    print("BigCommerce Order Analysis")
+    print("BigCommerce Order Analysis (Dual-Level)")
     print("=" * 50)
     
     try:
@@ -176,28 +267,38 @@ def main():
         return 1
     print(f"✅ Connected to: {result.get('store_name')}\n")
     
-    # Fetch and analyze
-    single_item_orders, order_products = get_order_data(client, months=args.months)
+    # 1. Prefetch Product Catalog (to map ID -> Categories)
+    product_categories, _ = prefetch_product_categories(client)
     
-    # Co-occurrence (likely sparse)
-    cooccurrence = analyze_cooccurrence(order_products, min_count=args.min_count)
-    print(f"\nFound {len(cooccurrence)} product pairs with {args.min_count}+ co-occurrences")
+    # 2. Fetch Orders
+    single_item_orders, multi_item_orders = get_order_data(client, months=args.months)
     
-    if cooccurrence:
-        print("\nTop co-purchased pairs:")
-        for r in cooccurrence[:10]:
-            print(f"  {r['product_a']} + {r['product_b']}: {r['count']} orders")
-    else:
-        print("(Sparse data - use attribute-based rules instead)")
+    # 3. Analyze Co-occurrence
+    cooccurrence_data = analyze_cooccurrence(
+        multi_item_orders, 
+        product_categories, 
+        min_count=args.min_count
+    )
     
-    # Cross-sell gaps
+    print(f"\nResults Summary:")
+    print(f"  Item-Item Pairs: {len(cooccurrence_data['item_cooccurrence'])}")
+    print(f"  Category-Item Pairs: {len(cooccurrence_data['category_cooccurrence'])}")
+    
+    if cooccurrence_data['item_cooccurrence']:
+        print("\nTop Item-Item Pairs:")
+        for r in cooccurrence_data['item_cooccurrence'][:5]:
+            print(f"  {r['item_a']} + {r['item_b']}: {r['count']} orders")
+            
+    if cooccurrence_data['category_cooccurrence']:
+        print("\nTop Category-Item Pairs:")
+        for r in cooccurrence_data['category_cooccurrence'][:5]:
+            print(f"  Category {r['category_id']} + Item {r['item_sku']}: {r['count']} orders")
+    
+    # 4. Analyze Gaps
     gaps = identify_cross_sell_gaps(single_item_orders)
-    print(f"\nTop single-item products (cross-sell opportunities):")
-    for g in gaps[:10]:
-        print(f"  {g['sku']}: {g['single_item_order_count']} solo orders ({g['opportunity']})")
     
-    # Save
-    save_results(cooccurrence, gaps, Path("data"))
+    # 5. Save
+    save_results(cooccurrence_data, gaps, Path("data"))
     
     return 0
 
