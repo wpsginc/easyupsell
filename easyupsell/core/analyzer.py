@@ -38,6 +38,7 @@ def run_analysis(
     # Import here to avoid circular deps
     sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
     from bigcommerce import BigCommerceClient
+    from bigquery_client import BigQueryClient
     
     sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
     from validate_category_pairings import get_llm_validation
@@ -55,9 +56,19 @@ def run_analysis(
     cats = client.get_categories()
     id_to_name = {c["id"]: c["name"] for c in cats}
     
-    # Get order data
+    # Get order data from BigQuery
     if not skip_orders:
-        category_sales, item_sales, product_categories = get_order_data(client, months=6)
+        console.print("  [cyan]Fetching sales metrics from BigQuery...[/cyan]")
+        bq = BigQueryClient()
+        
+        df_cat_sales = bq.get_top_categories()
+        category_sales = df_cat_sales.set_index("id").to_dict(orient="index")
+        
+        df_item_sales = bq.get_item_sales()
+        item_sales = df_item_sales.set_index("id").to_dict(orient="index")
+        
+        # product_categories mapping still needs to be populated if used
+        product_categories = {}
     else:
         category_sales, item_sales, product_categories = {}, {}, {}
         console.print("  [dim](Skipped order analysis)[/dim]")
@@ -75,7 +86,7 @@ def run_analysis(
     console.print(f"\nAnalyzing {len(top_categories)} categories...")
     
     # Get high-value items
-    high_value_items = get_high_value_items_with_sales(client, item_sales, product_categories)
+    high_value_items = get_high_value_items_with_sales(client, item_sales)
     
     # Generate recommendations
     all_recommendations = []
@@ -115,61 +126,6 @@ def run_analysis(
     }
 
 
-def get_order_data(bc_client, months: int = 6) -> tuple[dict, dict, dict]:
-    """Analyze order history for sales metrics."""
-    console.print(f"  Analyzing {months} months of orders...")
-    
-    min_date = datetime.now() - timedelta(days=months * 30)
-    min_date_str = min_date.strftime("%a, %d %b %Y 00:00:00 +0000")
-    
-    try:
-        orders = bc_client.get_orders(min_date=min_date_str, status_id=11)
-        orders.extend(bc_client.get_orders(min_date=min_date_str, status_id=10))
-    except Exception as e:
-        console.print(f"  [yellow]⚠ Could not fetch orders: {e}[/yellow]")
-        return {}, {}, {}
-    
-    console.print(f"  Found {len(orders)} orders")
-    
-    category_sales = defaultdict(lambda: {"order_count": 0, "revenue": 0.0})
-    item_sales = defaultdict(lambda: {"order_count": 0, "units_sold": 0, "revenue": 0.0})
-    product_categories = {}
-    
-    sample_size = min(300, len(orders))
-    
-    for i, order in enumerate(orders[:sample_size]):
-        try:
-            products = bc_client.get_order_products(order["id"])
-            for p in products:
-                product_id = p.get("product_id")
-                qty = p.get("quantity", 1)
-                price = float(p.get("base_price", 0)) * qty
-                
-                item_sales[product_id]["order_count"] += 1
-                item_sales[product_id]["units_sold"] += qty
-                item_sales[product_id]["revenue"] += price
-                
-                if product_id and product_id not in product_categories:
-                    try:
-                        prod = bc_client.get_product(product_id)
-                        product_categories[product_id] = prod.get("categories", [])
-                    except:
-                        product_categories[product_id] = []
-                
-                for cat_id in product_categories.get(product_id, []):
-                    category_sales[cat_id]["order_count"] += 1
-                    category_sales[cat_id]["revenue"] += price
-        except:
-            continue
-        
-        if (i + 1) % 100 == 0:
-            console.print(f"    Processed {i + 1}/{sample_size} orders...")
-            sleep(0.1)
-    
-    console.print(f"  [green]✓[/green] Sales data: {len(category_sales)} categories, {len(item_sales)} items")
-    return dict(category_sales), dict(item_sales), product_categories
-
-
 def get_top_categories_by_sales(bc_client, category_sales: dict, limit: int) -> list[dict]:
     """Get top categories by order volume."""
     cats = bc_client.get_categories()
@@ -200,13 +156,15 @@ def get_top_categories_by_sales(bc_client, category_sales: dict, limit: int) -> 
             "is_leaf": cat_id not in parent_ids,
         })
     
-    scored.sort(key=lambda x: -x["order_count"])
+    # Use Total Revenue to identify top performing categories per spec
+    scored.sort(key=lambda x: -x["revenue"])
     return scored[:limit]
 
 
-def get_high_value_items_with_sales(bc_client, item_sales: dict, product_categories: dict) -> list[dict]:
+def get_high_value_items_with_sales(bc_client, item_sales: dict) -> list[dict]:
     """Get high-value upsell candidates with priority brand boosting."""
     from easyupsell.commands.brands import load_brands
+    from bigquery_client import BigQueryClient
     
     priority_brands = load_brands()
     
@@ -221,13 +179,18 @@ def get_high_value_items_with_sales(bc_client, item_sales: dict, product_categor
         price = float(p.get("price", 0) or 0)
         product_id = p["id"]
         name = p.get("name", "")
+        bpn = p.get("bin_picking_number", "")
         
         if 15 <= price <= 200 and p.get("is_visible", True):
             sales = item_sales.get(product_id, {})
             
+            # Extract NetSuite ID per spec
+            netsuite_id = BigQueryClient.extract_netsuite_id(bpn)
+            
             item = {
                 "id": product_id,
                 "sku": p.get("sku", ""),
+                "netsuite_id": netsuite_id,
                 "name": name[:60],
                 "price": price,
                 "categories": p.get("categories", []),
@@ -318,6 +281,7 @@ def find_recommendations_for_category(
             "src_orders_6mo": category["order_count"],
             "src_revenue_6mo": category["revenue"],
             "recommended_sku": item["sku"],
+            "recommended_netsuite_id": item.get("netsuite_id"),
             "recommended_name": item["name"],
             "recommended_price": item["price"],
             "recommended_categories": " | ".join(filter(None, item_cat_names)),
@@ -342,7 +306,8 @@ def save_recommendations(recommendations: list[dict], output_path: Path):
     
     fieldnames = [
         "source_category", "src_orders_6mo", "src_revenue_6mo",
-        "recommended_sku", "recommended_name", "recommended_price", "recommended_categories",
+        "recommended_sku", "recommended_netsuite_id", "recommended_name", 
+        "recommended_price", "recommended_categories",
         "item_orders_6mo", "item_units_6mo", "item_revenue_6mo",
         "llm_valid", "llm_confidence", "relationship_type", "llm_reason",
     ]

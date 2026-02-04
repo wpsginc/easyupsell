@@ -1,6 +1,6 @@
 # EasyUpsell Product Roadmap
 
-**Status:** ⚠️ Needs Fixes (BQ category query + NS ID missing)
+**Status:** ⚠️ In Progress (BQ category query ✅ done, NS ID in output pending)
 
 > ⚠️ **RENAME PENDING**: This project will be renamed to **PRE (Product Recommendation Engine)** - see Phase 5 below.
 

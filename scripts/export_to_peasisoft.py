@@ -25,7 +25,10 @@ def export_approved(input_csv: Path, output_csv: Path):
     
     # Target columns for Peasisoft (Assumed based on app type)
     # Most apps want: Source Identifier, Target Identifier, Optional Weight
-    fieldnames = ["source_category", "recommended_sku", "recommended_name", "suggested_weight"]
+    fieldnames = [
+        "source_category", "recommended_netsuite_id", "recommended_sku", 
+        "recommended_name", "suggested_weight"
+    ]
 
     try:
         with open(input_csv, "r", encoding="utf-8") as f_in:

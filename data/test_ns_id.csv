@@ -1,0 +1,2 @@
+source_category,src_orders_6mo,src_revenue_6mo,recommended_sku,recommended_name,recommended_price,recommended_categories,recommended_netsuite_id,item_orders_6mo,item_units_6mo,item_revenue_6mo,copurchase_count,margin_pct,velocity_90d,llm_valid,llm_confidence,relationship_type,llm_reason
+Inventory Blowout,23164,6478585.25,BENCH-7BLKW,Benchmade 7 Hook/Strap Cutter with MOLLE Sheath,50.0,Tools | Knives and Multi Tools,,0,0,0,0,,,,0,,Missing from batch response

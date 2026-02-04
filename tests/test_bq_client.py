@@ -43,6 +43,46 @@ def test_run_query(mock_bq_client):
     # Verify result
     pd.testing.assert_frame_equal(result, mock_df)
 
+def test_get_top_categories(mock_bq_client):
+    """Test get_top_categories uses the correct SQL."""
+    mock_query_job = Mock()
+    mock_query_job.to_dataframe.return_value = pd.DataFrame({"id": [1]})
+    mock_bq_client.return_value.query.return_value = mock_query_job
+    
+    client = BigQueryClient(project_id="test-project")
+    client.get_top_categories()
+    
+    mock_bq_client.return_value.query.assert_called_with(BigQueryClient.QUERY_TOP_CATEGORIES)
+
+def test_get_item_sales(mock_bq_client):
+    """Test get_item_sales uses the correct SQL."""
+    mock_query_job = Mock()
+    mock_query_job.to_dataframe.return_value = pd.DataFrame({"id": [1]})
+    mock_bq_client.return_value.query.return_value = mock_query_job
+    
+    client = BigQueryClient(project_id="test-project")
+    client.get_item_sales()
+    
+    mock_bq_client.return_value.query.assert_called_with(BigQueryClient.QUERY_ITEM_SALES)
+
+def test_get_category_item_recommendations(mock_bq_client):
+    """Test get_category_item_recommendations and NetSuite ID extraction."""
+    mock_query_job = Mock()
+    mock_df = pd.DataFrame({
+        "category_id": [10],
+        "rec_id": [20],
+        "copurchase_count": [5],
+        "rec_bpn": ["NS123, BPN"]
+    })
+    mock_query_job.to_dataframe.return_value = mock_df
+    mock_bq_client.return_value.query.return_value = mock_query_job
+    
+    client = BigQueryClient(project_id="test-project")
+    result = client.get_category_item_recommendations()
+    
+    mock_bq_client.return_value.query.assert_called_with(BigQueryClient.QUERY_CATEGORY_ITEM_ENRICHED)
+    assert result.iloc[0]["rec_netsuite_id"] == "NS123"
+
 def test_extract_netsuite_id_static_method():
     """Test the static helper method for parsing BPN."""
     # Valid BPN

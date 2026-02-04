@@ -27,6 +27,7 @@ from rich.console import Console
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from bigcommerce import BigCommerceClient
+from bigquery_client import BigQueryClient
 from config import settings
 from enrichment import EnrichmentService
 
@@ -361,6 +362,7 @@ def find_recommendations_for_category(
             "recommended_name": item["name"],
             "recommended_price": item["price"],
             "recommended_categories": " | ".join(filter(None, item_cat_names)),
+            "recommended_netsuite_id": stats.get("rec_netsuite_id"),
             
             # Item sales
             "item_orders_6mo": item["order_count"],
@@ -389,6 +391,7 @@ def main():
     parser.add_argument("--output", default=str(settings.DATA_DIR / "full_recommendations.csv"), help="Output CSV")
     parser.add_argument("--provider", default=settings.DEFAULT_PROVIDER, help="LLM provider")
     parser.add_argument("--skip-orders", action="store_true", help="Skip order analysis (use random categories)")
+    parser.add_argument("--use-bq", action="store_true", help="Use BigQuery for category ranking (FAST, recommended)")
     parser.add_argument("--no-cache", action="store_true", help="Disable caching")
     args = parser.parse_args()
     
@@ -416,8 +419,28 @@ def main():
     # Initialize Enrichment
     enrichment = EnrichmentService()
     
-    # Get order data
-    if not args.skip_orders:
+    # Get order data - use BigQuery if available (FAST), else fall back to BC API (SLOW)
+    if args.use_bq:
+        print("\n📊 Using BigQuery for category ranking (fast mode)...")
+        try:
+            bq_client = BigQueryClient()
+            bq_categories = bq_client.get_top_categories()
+            # Convert DataFrame to list of dicts matching expected format
+            category_sales = {}
+            for _, row in bq_categories.iterrows():
+                category_sales[row['id']] = {
+                    'order_count': int(row['order_count']),
+                    'revenue': float(row['revenue']),
+                    'total_quantity': int(row['total_quantity'])
+                }
+            print(f"  ✅ Loaded {len(category_sales)} categories from BigQuery")
+            item_sales, product_categories = {}, {}  # Not needed when using BQ
+        except Exception as e:
+            print(f"  ⚠️ BigQuery failed: {e}")
+            print("  Falling back to BC API...")
+            category_sales, item_sales, product_categories = get_order_data(client, months=6)
+    elif not args.skip_orders:
+        print("\n⏳ Using BigCommerce API for order analysis (slow)...")
         category_sales, item_sales, product_categories = get_order_data(client, months=6)
     else:
         category_sales, item_sales, product_categories = {}, {}, {}
@@ -456,7 +479,7 @@ def main():
     
     fieldnames = [
         "source_category", "src_orders_6mo", "src_revenue_6mo",
-        "recommended_sku", "recommended_name", "recommended_price", "recommended_categories",
+        "recommended_sku", "recommended_name", "recommended_price", "recommended_categories", "recommended_netsuite_id",
         "item_orders_6mo", "item_units_6mo", "item_revenue_6mo",
         "copurchase_count", "margin_pct", "velocity_90d",
         "llm_valid", "llm_confidence", "relationship_type", "llm_reason",
