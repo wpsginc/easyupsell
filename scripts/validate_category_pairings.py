@@ -12,18 +12,16 @@ Usage:
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Optional
 
 import requests
-from dotenv import load_dotenv
 
-load_dotenv()
-
-# Import store context
+# Add src to path for config and context
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from config import settings
+
 try:
     from context import STORE_CONTEXT, build_enriched_prompt, get_category_context
     HAS_CONTEXT = True
@@ -72,6 +70,10 @@ Evaluate if this is a SENSIBLE upsell recommendation. Consider:
 1. Are these products logically complementary or used together IN THE SAME JOB FUNCTION?
 2. Would a customer buying the source REALISTICALLY also need the target?
 3. Is this a professional/practical pairing (not random)?
+
+CRITICAL EXCEPTIONS:
+- If the item is in the SAME category (e.g., Helmet Light for Helmets), it is VALID if it is an accessory, part, or upgrade.
+- Consumables (batteries, cleaning kits) are almost always VALID.
 
 {context if context and not HAS_CONTEXT else ""}
 
@@ -152,9 +154,14 @@ Evaluate EACH of these {len(items_to_evaluate)} potential upsell items:
 {item_list}
 
 For EACH item, determine if it's a sensible upsell. Consider:
-1. Is this item complementary to {source_category}?
+1. Is this item complementary to {source_category} OR an accessory for it?
 2. Would a customer REALISTICALLY buy both together?
 3. Is this a professional/practical pairing?
+
+CRITICAL EXCEPTIONS:
+- If the item is in the SAME category (e.g., Helmet Light for Helmets), it is VALID if it is an accessory, part, or upgrade.
+- Do NOT reject items just because they share a category name.
+- Consumables (batteries, cleaning kits) are almost always VALID.
 
 Respond with a JSON array containing one object per item, in order:
 [
@@ -208,11 +215,9 @@ IMPORTANT: Return ONLY the JSON array, no other text."""
 
 def _call_athena_batch(prompt: str, expected_count: int) -> list:
     """Call Athena for batch validation."""
-    athena_url = os.environ.get("ATHENA_HOST", "http://100.64.0.3:8081")
-    
     try:
         response = requests.post(
-            f"{athena_url}/v1/chat/completions",
+            f"{settings.ATHENA_HOST}/v1/chat/completions",
             headers={"Content-Type": "application/json"},
             json={
                 "model": "gpt-oss-120b-derestricted",
@@ -220,7 +225,7 @@ def _call_athena_batch(prompt: str, expected_count: int) -> list:
                 "temperature": 0.3,
                 "max_tokens": 300 * expected_count,  # ~300 tokens per item
             },
-            timeout=300,  # 5 min for large batches
+            timeout=settings.BATCH_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
@@ -232,16 +237,13 @@ def _call_athena_batch(prompt: str, expected_count: int) -> list:
 
 def _call_azure_batch(prompt: str, expected_count: int, deployment: Optional[str] = None) -> list:
     """Call Azure for batch validation."""
-    api_key = os.environ.get("AZURE_OPENAI_API_KEY")
-    api_base = os.environ.get("AZURE_OPENAI_API_BASE")
-    api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-04-01-preview")
     if deployment is None:
-        deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        deployment = settings.AZURE_OPENAI_DEPLOYMENT
     
-    if not api_key or not api_base:
+    if not settings.AZURE_OPENAI_API_KEY or not settings.AZURE_OPENAI_API_BASE:
         return []
     
-    url = f"{api_base.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
+    url = f"{settings.AZURE_OPENAI_API_BASE.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={settings.AZURE_OPENAI_API_VERSION}"
     
     payload = {
         "messages": [{"role": "user", "content": prompt}],
@@ -260,9 +262,9 @@ def _call_azure_batch(prompt: str, expected_count: int, deployment: Optional[str
     try:
         response = requests.post(
             url,
-            headers={"api-key": api_key, "Content-Type": "application/json"},
+            headers={"api-key": settings.AZURE_OPENAI_API_KEY, "Content-Type": "application/json"},
             json=payload,
-            timeout=300,
+            timeout=settings.BATCH_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
@@ -302,17 +304,14 @@ def _parse_batch_json(content: str) -> list:
 
 def _call_azure_openai(prompt: str, deployment: Optional[str] = None) -> dict:
     """Call Azure OpenAI API."""
-    api_key = os.environ.get("AZURE_OPENAI_API_KEY")
-    api_base = os.environ.get("AZURE_OPENAI_API_BASE")
-    api_version = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-04-01-preview")
     if deployment is None:
-        deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+        deployment = settings.AZURE_OPENAI_DEPLOYMENT
     
-    if not api_key or not api_base:
+    if not settings.AZURE_OPENAI_API_KEY or not settings.AZURE_OPENAI_API_BASE:
         return {"valid": None, "confidence": 0, "reason": "Azure OpenAI not configured"}
     
     # Azure OpenAI endpoint format
-    url = f"{api_base.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
+    url = f"{settings.AZURE_OPENAI_API_BASE.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={settings.AZURE_OPENAI_API_VERSION}"
     
     # GPT-5 models use max_completion_tokens instead of max_tokens
     # GPT-5-nano doesn't support temperature parameter
@@ -336,7 +335,7 @@ def _call_azure_openai(prompt: str, deployment: Optional[str] = None) -> dict:
     response = requests.post(
         url,
         headers={
-            "api-key": api_key,
+            "api-key": settings.AZURE_OPENAI_API_KEY,
             "Content-Type": "application/json",
         },
         json=payload,
@@ -350,13 +349,12 @@ def _call_azure_openai(prompt: str, deployment: Optional[str] = None) -> dict:
 
 def _call_openai(prompt: str) -> dict:
     """Call OpenAI API."""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
+    if not settings.OPENAI_API_KEY:
         return {"valid": None, "confidence": 0, "reason": "No OPENAI_API_KEY set"}
     
     response = requests.post(
         "https://api.openai.com/v1/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}"},
+        headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
         json={
             "model": "gpt-4o-mini",
             "messages": [{"role": "user", "content": prompt}],
@@ -373,10 +371,8 @@ def _call_openai(prompt: str) -> dict:
 
 def _call_ollama(prompt: str) -> dict:
     """Call local Ollama instance."""
-    ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-    
     response = requests.post(
-        f"{ollama_host}/api/generate",
+        f"{settings.OLLAMA_HOST}/api/generate",
         json={
             "model": "llama3.2",
             "prompt": prompt,
@@ -393,14 +389,11 @@ def _call_ollama(prompt: str) -> dict:
 
 def _call_litellm(prompt: str) -> dict:
     """Call via LiteLLM proxy (Moltbot/Athena compatible)."""
-    litellm_host = os.environ.get("LITELLM_HOST", "http://localhost:4000")
-    api_key = os.environ.get("LITELLM_API_KEY", "")
-    
     response = requests.post(
-        f"{litellm_host}/v1/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+        f"{settings.LITELLM_HOST}/v1/chat/completions",
+        headers={"Authorization": f"Bearer {settings.LITELLM_API_KEY}"} if settings.LITELLM_API_KEY else {},
         json={
-            "model": os.environ.get("LITELLM_MODEL", "gpt-4o-mini"),
+            "model": settings.LITELLM_MODEL,
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
             "temperature": 0.3,
@@ -415,8 +408,6 @@ def _call_litellm(prompt: str) -> dict:
 
 def _call_athena(prompt: str) -> dict:
     """Call GPT-OSS 120B on Athena (local inference, FREE!)."""
-    athena_host = os.environ.get("ATHENA_HOST", "http://100.64.0.3:8081")
-    
     # Simplified prompt for better JSON response
     simple_prompt = f"""{prompt}
 
@@ -425,7 +416,7 @@ CRITICAL: Output ONLY valid JSON with these exact fields:
     
     # GPT-OSS uses OpenAI-compatible API
     response = requests.post(
-        f"{athena_host}/v1/chat/completions",
+        f"{settings.ATHENA_HOST}/v1/chat/completions",
         headers={"Content-Type": "application/json"},
         json={
             "model": "gpt-oss-120b",
@@ -558,9 +549,9 @@ def generate_child_category_pairings(categories: list[dict]) -> list[tuple[str, 
 
 def main():
     parser = argparse.ArgumentParser(description="Validate category pairings with LLM")
-    parser.add_argument("--provider", default="azure", choices=["azure", "openai", "ollama", "litellm"])
-    parser.add_argument("--categories", default="data/categories.json", help="Categories file")
-    parser.add_argument("--output", default="data/validated_pairings", help="Output path")
+    parser.add_argument("--provider", default=settings.DEFAULT_PROVIDER, choices=["azure", "openai", "ollama", "litellm", "athena"])
+    parser.add_argument("--categories", default=str(settings.DATA_DIR / "categories.json"), help="Categories file")
+    parser.add_argument("--output", default=str(settings.DATA_DIR / "validated_pairings"), help="Output path")
     args = parser.parse_args()
     
     print("LLM-Validated Category Recommendations")

@@ -14,6 +14,8 @@ A CLI-first upsell recommendation engine for BigCommerce stores. Uses LLM valida
 - [x] LLM validation via Azure OpenAI
 - [x] Priority brand boosting (Streamlight, Benchmade, etc.)
 - [x] CSV output with full metrics
+- [x] **Batched LLM calls** (Implemented 2026-02-03)
+- [x] **Enterprise Hardening** (Config module, Pydantic, No hardcoded paths)
 
 ### 1.2 Production CLI (Current)
 Build `easyupsell` CLI with progressive disclosure:

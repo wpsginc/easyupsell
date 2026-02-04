@@ -11,6 +11,8 @@ from typing import Any, Optional
 import requests
 from dotenv import load_dotenv
 
+from cache import Cache
+
 
 class BigCommerceClient:
     """Client for BigCommerce V3 REST API."""
@@ -32,6 +34,8 @@ class BigCommerceClient:
             "Accept": "application/json",
             "Content-Type": "application/json",
         })
+        
+        self.cache = Cache()
 
     @classmethod
     def from_env(cls, store_prefix: str = "BC") -> "BigCommerceClient":
@@ -122,15 +126,30 @@ class BigCommerceClient:
         limit: int = 250,
         sku: Optional[str] = None,
         name: Optional[str] = None,
+        use_cache: bool = True,
     ) -> list[dict[str, Any]]:
         """Get products with optional filtering."""
+        # Only cache if no filters are applied (bulk fetch)
+        is_bulk = (sku is None and name is None)
+        cache_key = f"products_limit_{limit}"
+        
+        if use_cache and is_bulk:
+            cached = self.cache.get(cache_key)
+            if cached:
+                return cached
+
         params = {}
         if sku:
             params["sku"] = sku
         if name:
             params["name"] = name
 
-        return self._get_paginated("catalog/products", params, limit)
+        data = self._get_paginated("catalog/products", params, limit)
+        
+        if use_cache and is_bulk:
+            self.cache.set(cache_key, data)
+            
+        return data
 
     def get_product_by_sku(self, sku: str) -> Optional[dict[str, Any]]:
         """Get a product by SKU."""
@@ -146,9 +165,21 @@ class BigCommerceClient:
         response = self._get("catalog/trees/categories")
         return response.get("data", [])
 
-    def get_categories(self, limit: int = 250) -> list[dict[str, Any]]:
+    def get_categories(self, limit: int = 250, use_cache: bool = True) -> list[dict[str, Any]]:
         """Get all categories (flat list)."""
-        return self._get_paginated("catalog/categories", limit=limit)
+        cache_key = f"categories_limit_{limit}"
+        
+        if use_cache:
+            cached = self.cache.get(cache_key)
+            if cached:
+                return cached
+                
+        data = self._get_paginated("catalog/categories", limit=limit)
+        
+        if use_cache:
+            self.cache.set(cache_key, data)
+            
+        return data
 
     # -------------------------------------------------------------------------
     # Variants

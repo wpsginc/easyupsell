@@ -21,13 +21,36 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from time import sleep
 
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn
+from rich.console import Console
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from bigcommerce import BigCommerceClient
+from config import settings
 
 # Import LLM validation
 sys.path.insert(0, str(Path(__file__).parent))
 from validate_category_pairings import get_llm_validation, get_batch_llm_validation
+
+console = Console()
+
+def get_processed_categories(output_path: Path) -> set[str]:
+    """Get list of categories already processed in the output CSV."""
+    if not output_path.exists():
+        return set()
+    
+    processed = set()
+    try:
+        with open(output_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get("source_category"):
+                    processed.add(row["source_category"])
+    except Exception:
+        pass
+        
+    return processed
 
 
 def get_order_data(bc_client: BigCommerceClient, months: int = 6) -> tuple[dict, dict, dict]:
@@ -100,9 +123,10 @@ def get_top_categories_by_sales(
     bc_client: BigCommerceClient,
     category_sales: dict,
     limit: int = 30,
+    use_cache: bool = True,
 ) -> list[dict]:
     """Get top categories by order volume, excluding meta-categories."""
-    cats = bc_client.get_categories()
+    cats = bc_client.get_categories(use_cache=use_cache)
     
     # Build parent set
     parent_ids = set(c.get("parent_id", 0) for c in cats)
@@ -149,6 +173,7 @@ def get_high_value_items_with_sales(
     product_categories: dict,
     limit: int = 300,
     priority_brands: list[str] = None,
+    use_cache: bool = True,
 ) -> list[dict]:
     """
     Get high-value items that make good upsell candidates.
@@ -163,7 +188,7 @@ def get_high_value_items_with_sales(
     
     print("Fetching high-value item candidates...")
     
-    products = bc_client.get_products(limit=2000)  # Get more products
+    products = bc_client.get_products(limit=2000, use_cache=use_cache)  # Get more products
     
     priority_items = []
     regular_items = []
@@ -277,7 +302,7 @@ def find_recommendations_for_category(
             category_name, 
             batch_items, 
             provider=provider,
-            max_items=50,  # Process up to 50 at a time
+            max_items=settings.MAX_BATCH_SIZE,  # Process up to 50 at a time
         )
     except Exception as e:
         print(f"    Batch validation error: {e}")
@@ -322,10 +347,13 @@ def main():
     parser = argparse.ArgumentParser(description="Full recommendation analysis with sales data")
     parser.add_argument("--top-categories", type=int, default=20, help="Number of top categories by sales")
     parser.add_argument("--items-per-category", type=int, default=6, help="Candidate items per category")
-    parser.add_argument("--output", default="data/full_recommendations.csv", help="Output CSV")
-    parser.add_argument("--provider", default="azure", help="LLM provider")
+    parser.add_argument("--output", default=str(settings.DATA_DIR / "full_recommendations.csv"), help="Output CSV")
+    parser.add_argument("--provider", default=settings.DEFAULT_PROVIDER, help="LLM provider")
     parser.add_argument("--skip-orders", action="store_true", help="Skip order analysis (use random categories)")
+    parser.add_argument("--no-cache", action="store_true", help="Disable caching")
     args = parser.parse_args()
+    
+    use_cache = not args.no_cache
     
     print("Full Category → Item Recommendation Analysis")
     print("=" * 60)
@@ -354,7 +382,12 @@ def main():
         print("  (Skipped order analysis)")
     
     # Get top categories
-    top_categories = get_top_categories_by_sales(client, category_sales, limit=args.top_categories)
+    top_categories = get_top_categories_by_sales(
+        client, 
+        category_sales, 
+        limit=args.top_categories, 
+        use_cache=use_cache
+    )
     print(f"\nTop {len(top_categories)} categories by sales:")
     for i, cat in enumerate(top_categories[:10]):
         print(f"  {i+1}. {cat['name']} ({cat['order_count']} orders, ${cat['revenue']})")
@@ -362,11 +395,22 @@ def main():
         print(f"  ... and {len(top_categories) - 10} more")
     
     # Get high-value items
-    high_value_items = get_high_value_items_with_sales(client, item_sales, product_categories, limit=300)
+    high_value_items = get_high_value_items_with_sales(
+        client, 
+        item_sales, 
+        product_categories, 
+        limit=300, 
+        use_cache=use_cache
+    )
     
-    # Prepare output file - write header first
+    # Prepare output file
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Check for existing work
+    processed_categories = get_processed_categories(output_path)
+    if processed_categories:
+        console.print(f"[yellow]Found {len(processed_categories)} already processed categories. Resuming...[/yellow]")
     
     fieldnames = [
         "source_category", "src_orders_6mo", "src_revenue_6mo",
@@ -375,48 +419,62 @@ def main():
         "llm_valid", "llm_confidence", "relationship_type", "llm_reason",
     ]
     
-    # Write header
-    with open(output_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
+    # Write header if new file
+    if not output_path.exists():
+        with open(output_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
     
-    # Generate recommendations and write incrementally
+    # Generate recommendations
     all_recommendations = []
     
-    for i, cat in enumerate(top_categories):
-        print(f"\n[{i+1}/{len(top_categories)}] {cat['name']} ({cat['order_count']} orders)")
-        sys.stdout.flush()
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeRemainingColumn(),
+    ) as progress:
         
-        recs = find_recommendations_for_category(
-            cat, high_value_items, id_to_name,
-            provider=args.provider,
-            max_items=args.items_per_category,
-        )
+        task_id = progress.add_task("Processing Categories...", total=len(top_categories))
         
-        valid_count = sum(1 for r in recs if r["llm_valid"])
-        print(f"  → {valid_count}/{len(recs)} valid recommendations")
-        sys.stdout.flush()
-        
-        # Append to CSV immediately
-        with open(output_path, "a", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            for r in recs:
-                writer.writerow(r)
-        
-        all_recommendations.extend(recs)
+        for i, cat in enumerate(top_categories):
+            cat_name = cat['name']
+            
+            # Resume Check
+            if cat_name in processed_categories:
+                progress.update(task_id, advance=1, description=f"Skipping {cat_name} (Done)")
+                continue
+
+            progress.update(task_id, description=f"Analyzing {cat_name}...")
+            
+            try:
+                recs = find_recommendations_for_category(
+                    cat, high_value_items, id_to_name,
+                    provider=args.provider,
+                    max_items=args.items_per_category,
+                )
+                
+                valid_count = sum(1 for r in recs if r["llm_valid"])
+                
+                # Append to CSV immediately
+                with open(output_path, "a", newline="") as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    for r in recs:
+                        writer.writerow(r)
+                
+                all_recommendations.extend(recs)
+                progress.console.print(f"  ✓ {cat_name}: {valid_count}/{len(recs)} valid")
+                
+            except Exception as e:
+                progress.console.print(f"[red]Error analyzing {cat_name}: {e}[/red]")
+            
+            progress.advance(task_id)
     
     # Summary
-    valid = [r for r in all_recommendations if r.get("llm_valid")]
-    print(f"\n{'=' * 60}")
-    print(f"✅ Valid recommendations: {len(valid)} / {len(all_recommendations)} ({100*len(valid)//len(all_recommendations) if all_recommendations else 0}%)")
-    print(f"✅ Saved: {output_path}")
-    
-    # Show top valid recommendations
-    if valid:
-        print(f"\nTop 10 recommendations:")
-        for r in sorted(valid, key=lambda x: (-x["src_orders_6mo"], -x["item_orders_6mo"]))[:10]:
-            print(f"  {r['source_category']} → {r['recommended_name']} (${r['recommended_price']})")
-            print(f"    Cat orders: {r['src_orders_6mo']}, Item orders: {r['item_orders_6mo']}")
+    # Note: all_recommendations only contains THIS run's items. 
+    # To be accurate, we'd need to re-read the CSV.
+    console.print(f"\n✅ Run Complete. Output saved to: {output_path}")
     
     return 0
 
