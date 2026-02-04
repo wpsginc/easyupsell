@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from bigcommerce import BigCommerceClient
 from config import settings
+from enrichment import EnrichmentService
 
 # Import LLM validation
 sys.path.insert(0, str(Path(__file__).parent))
@@ -243,6 +244,7 @@ def find_recommendations_for_category(
     category: dict,
     all_items: list[dict],
     id_to_name: dict,
+    enrichment_service: EnrichmentService,
     provider: str = "azure",
     max_items: int = 8,
 ) -> list[dict]:
@@ -292,10 +294,39 @@ def find_recommendations_for_category(
             break
     
     # Validate with LLM in batch (much faster - single prompt processing)
-    batch_items = [
-        {"name": item["name"], "sku": item.get("sku", ""), "brand": item.get("brand", "")}
-        for item in selected
-    ]
+    batch_items = []
+    
+    # Pre-fetch category co-purchase stats for efficient lookup
+    cat_id = category["id"]
+    cat_recs = enrichment_service.category_map.get(cat_id, [])
+    # Create lookup map by SKU for O(1) access
+    stats_by_sku = {r.get("rec_sku"): r for r in cat_recs if r.get("rec_sku")}
+
+    for item in selected:
+        sku = item.get("sku", "")
+        stats = stats_by_sku.get(sku, {})
+        
+        copurchase_count = stats.get("copurchase_count", 0)
+        margin = stats.get("rec_margin")
+        velocity = stats.get("rec_velocity")
+        
+        item_data = {
+            "name": item["name"], 
+            "sku": sku, 
+            "brand": item.get("brand", ""),
+            "price": item.get("price"),
+        }
+        
+        if copurchase_count > 0:
+            item_data["copurchase_text"] = f"Co-purchased with '{category_name}': {copurchase_count} times"
+        
+        if margin is not None:
+            item_data["margin_pct"] = margin
+            
+        if velocity is not None:
+             item_data["velocity_text"] = f"Velocity: {velocity} units/90d"
+             
+        batch_items.append(item_data)
     
     try:
         batch_results = get_batch_llm_validation(
@@ -316,6 +347,9 @@ def find_recommendations_for_category(
         # Get item's category names
         item_cat_names = [id_to_name.get(c, "") for c in item["categories"][:2]]
         
+        # Get enrichment stats again
+        stats = stats_by_sku.get(item.get("sku", ""), {})
+        
         recommendations.append({
             # Source category
             "source_category": category_name,
@@ -332,6 +366,11 @@ def find_recommendations_for_category(
             "item_orders_6mo": item["order_count"],
             "item_units_6mo": item["units_sold"],
             "item_revenue_6mo": item["revenue"],
+            
+            # Enrichment
+            "copurchase_count": stats.get("copurchase_count", 0),
+            "margin_pct": stats.get("rec_margin", ""),
+            "velocity_90d": stats.get("rec_velocity", ""),
             
             # LLM
             "llm_valid": result.get("valid"),
@@ -373,6 +412,9 @@ def main():
     # Get category mappings
     cats = client.get_categories()
     id_to_name = {c["id"]: c["name"] for c in cats}
+
+    # Initialize Enrichment
+    enrichment = EnrichmentService()
     
     # Get order data
     if not args.skip_orders:
@@ -416,6 +458,7 @@ def main():
         "source_category", "src_orders_6mo", "src_revenue_6mo",
         "recommended_sku", "recommended_name", "recommended_price", "recommended_categories",
         "item_orders_6mo", "item_units_6mo", "item_revenue_6mo",
+        "copurchase_count", "margin_pct", "velocity_90d",
         "llm_valid", "llm_confidence", "relationship_type", "llm_reason",
     ]
     
@@ -451,6 +494,7 @@ def main():
             try:
                 recs = find_recommendations_for_category(
                     cat, high_value_items, id_to_name,
+                    enrichment_service=enrichment,
                     provider=args.provider,
                     max_items=args.items_per_category,
                 )

@@ -100,9 +100,28 @@ class ReviewApp(App):
         row_data = self.data[row_idx]
         
         detail = self.query_one("#detail-panel", Static)
+        
+        # Basic Info
         text = f"[bold blue]Source:[/bold blue] {row_data.get('source_category')}\n"
         text += f"[bold blue]Item:[/bold blue] {row_data.get('recommended_name')} ({row_data.get('recommended_sku')})\n"
-        text += f"[bold blue]LLM Reason:[/bold blue] {row_data.get('llm_reason')}\n"
+        
+        # Enrichment Data
+        if row_data.get('margin_pct'):
+            margin = float(row_data['margin_pct']) * 100
+            color = "green" if margin > 40 else "yellow" if margin > 20 else "red"
+            text += f"[bold]Margin:[/bold] [{color}]{margin:.1f}%[/{color}]  "
+            
+        if row_data.get('velocity_90d'):
+            vel = int(float(row_data['velocity_90d']))
+            text += f"[bold]Velocity (90d):[/bold] {vel} units  "
+            
+        if row_data.get('copurchase_count'):
+            text += f"[bold]Co-purchases:[/bold] {row_data['copurchase_count']}\n"
+        else:
+            text += "\n"
+            
+        # LLM Info
+        text += f"\n[bold blue]LLM Reason:[/bold blue] {row_data.get('llm_reason')}\n"
         text += f"[bold blue]Relationship:[/bold blue] {row_data.get('relationship_type')}\n"
         
         detail.update(text)
