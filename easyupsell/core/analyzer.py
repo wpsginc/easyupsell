@@ -236,20 +236,8 @@ def find_recommendations_for_category(
     category_name = category["name"]
     category_name_lower = category_name.lower()
     
-    # Filter items
-    eligible_items = []
-    for item in all_items:
-        item_name_lower = item["name"].lower()
-        
-        # Skip same product type
-        if category_name_lower in item_name_lower:
-            continue
-        
-        item_type = item_name_lower.split()[0] if item_name_lower else ""
-        if len(item_type) > 4 and item_type in category_name_lower:
-            continue
-        
-        eligible_items.append(item)
+    from candidate_filter import filter_candidates
+    eligible_items = filter_candidates(category, all_items)
     
     eligible_items.sort(key=lambda x: -x.get("order_count", 0))
     
@@ -282,6 +270,7 @@ def find_recommendations_for_category(
             "src_revenue_6mo": category["revenue"],
             "recommended_sku": item["sku"],
             "recommended_netsuite_id": item.get("netsuite_id"),
+            "same_category": item.get("same_category", False),
             "recommended_name": item["name"],
             "recommended_price": item["price"],
             "recommended_categories": " | ".join(filter(None, item_cat_names)),
@@ -306,7 +295,7 @@ def save_recommendations(recommendations: list[dict], output_path: Path):
     
     fieldnames = [
         "source_category", "src_orders_6mo", "src_revenue_6mo",
-        "recommended_sku", "recommended_netsuite_id", "recommended_name", 
+        "recommended_sku", "recommended_netsuite_id", "same_category", "recommended_name", 
         "recommended_price", "recommended_categories",
         "item_orders_6mo", "item_units_6mo", "item_revenue_6mo",
         "llm_valid", "llm_confidence", "relationship_type", "llm_reason",

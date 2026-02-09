@@ -1,6 +1,6 @@
 # EasyUpsell Product Roadmap
 
-**Status:** ⚠️ In Progress (BQ category query ✅ done, NS ID in output pending)
+**Status:** 🟢 Active Development
 
 > ⚠️ **RENAME PENDING**: This project will be renamed to **PRE (Product Recommendation Engine)** - see Phase 5 below.
 
@@ -56,7 +56,7 @@ easyupsell brands --list
 | `status` | Show analysis progress/stats |
 
 ### 1.3 Fixes & Features Needed
-- [ ] Allow same-category recommendations (helmet→helmet light)
+- [/] Allow same-category recommendations (helmet→helmet light) ← **CURRENT FOCUS**
 - [ ] Resume capability for interrupted runs
 - [ ] Progress bar for large batches
 - [ ] Local caching of category/product data
@@ -170,11 +170,11 @@ easyupsell brands --list
 - [ ] Push model preferred (secure, behind firewall, NS auth already solved)
 - [ ] Display in NS for users who live there (senior architect request)
 
-### 5.4 Critical Data Requirement: NetSuite ID
-- [ ] Extract NetSuite Internal ID from BigCommerce `bin_picking_number` field
-- [ ] BPN is comma-delimited; NS ID is always the **first value**
-- [ ] Include `netsuite_id` in all recommendation output
-- [ ] This is the **UID across all systems**: PIM, NS, CA, BC
+### 5.4 Critical Data Requirement: NetSuite ID ✅ (2026-02-05)
+- [x] Extract NetSuite Internal ID from BigCommerce `bin_picking_number` field
+- [x] BPN is comma-delimited; NS ID is always the **first value**
+- [x] Include `netsuite_id` in all recommendation output
+- [x] This is the **UID across all systems**: PIM, NS, CA, BC
 
 ### 5.5 Philosophy
 PRE is a **decision-support tool**, not an autonomous agent. AI surfaces candidates + enriched data; humans make final calls based on business context.

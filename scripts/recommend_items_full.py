@@ -259,23 +259,8 @@ def find_recommendations_for_category(
     category_name = category["name"]
     category_name_lower = category_name.lower()
     
-    # Filter items - exclude only if item IS the exact category being shopped
-    # e.g., don't recommend "Helmets" product to someone in "Helmets" category
-    # BUT DO recommend "Flashlights" even if they're also tagged in "Helmets"
-    eligible_items = []
-    for item in all_items:
-        item_name_lower = item["name"].lower()
-        
-        # Skip if item name contains the category name (same product type)
-        if category_name_lower in item_name_lower:
-            continue
-        
-        # Skip if category name contains the item type (e.g., "Helmets" category, "Helmet" item)
-        item_type = item_name_lower.split()[0] if item_name_lower else ""
-        if len(item_type) > 4 and item_type in category_name_lower:
-            continue
-            
-        eligible_items.append(item)
+    from candidate_filter import filter_candidates
+    eligible_items = filter_candidates(category, all_items)
     
     # Sort by sales (proven sellers first)
     eligible_items.sort(key=lambda x: -x.get("order_count", 0))
@@ -363,6 +348,7 @@ def find_recommendations_for_category(
             "recommended_price": item["price"],
             "recommended_categories": " | ".join(filter(None, item_cat_names)),
             "recommended_netsuite_id": stats.get("rec_netsuite_id"),
+            "same_category": item.get("same_category", False),
             
             # Item sales
             "item_orders_6mo": item["order_count"],
@@ -479,7 +465,7 @@ def main():
     
     fieldnames = [
         "source_category", "src_orders_6mo", "src_revenue_6mo",
-        "recommended_sku", "recommended_name", "recommended_price", "recommended_categories", "recommended_netsuite_id",
+        "recommended_sku", "recommended_name", "recommended_price", "recommended_categories", "recommended_netsuite_id", "same_category",
         "item_orders_6mo", "item_units_6mo", "item_revenue_6mo",
         "copurchase_count", "margin_pct", "velocity_90d",
         "llm_valid", "llm_confidence", "relationship_type", "llm_reason",

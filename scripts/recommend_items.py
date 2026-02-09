@@ -130,11 +130,8 @@ def find_recommendations_for_category(
     category_id = category["id"]
     category_name = category["name"]
     
-    # Items NOT in this category
-    cross_sell_items = [
-        item for item in all_items 
-        if category_id not in item["categories"]
-    ]
+    from candidate_filter import filter_candidates
+    cross_sell_items = filter_candidates(category, all_items)
     
     # Sample items from diverse categories
     seen_cats = set()

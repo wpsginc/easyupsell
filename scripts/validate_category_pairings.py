@@ -160,6 +160,8 @@ def get_batch_llm_validation(
             details.append(item['velocity_text'])
         if item.get('inventory_text'):
             details.append(item['inventory_text'])
+        if item.get('same_category'):
+            details.append("⚠️ SAME CATEGORY as source — valid ONLY if accessory/part/upgrade")
             
         # Combine
         if details:
