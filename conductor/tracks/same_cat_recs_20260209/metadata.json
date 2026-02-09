@@ -1,0 +1,8 @@
+{
+  "track_id": "same_cat_recs_20260209",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-09T12:00:00Z",
+  "updated_at": "2026-02-09T12:00:00Z",
+  "description": "Enable recommendations within the same category to support accessory use cases (e.g., Helmet -> Helmet Light)."
+}
