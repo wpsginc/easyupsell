@@ -1,7 +1,7 @@
 # Implementation Plan - Enable Same-Category Recommendations
 
 ## Phase 1: reproduction
-- [ ] Task: Create a reproduction test case
+- [x] Task: Create a reproduction test case [5fb680c]
     - [ ] Create a unit test in `tests/test_candidate_filter.py` using mock products from the same category.
     - [ ] Assert that the current behavior returns 0 candidates (confirming the block exists).
     - [ ] **Goal:** Fail the test (proving the filter is active) or confirm where the logic resides.
