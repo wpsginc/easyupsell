@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     LITELLM_API_KEY: Optional[str] = None
     LITELLM_MODEL: str = "gpt-4o-mini"
     
+    # Local LLM (Generic OpenAI Compatible)
+    LOCAL_LLM_HOST: str = "http://localhost:1234/v1"
+    LOCAL_LLM_MODEL: str = "local-model"
+    
     # Feature Flags / Parameters
     MAX_BATCH_SIZE: int = 50
     BATCH_TIMEOUT_SECONDS: int = 300

@@ -101,6 +101,8 @@ Respond in JSON format:
         return _call_litellm(prompt)
     elif provider == "athena":
         return _call_athena(prompt)
+    elif provider == "local":
+        return _call_local_llm(prompt)
     else:
         # Default: return uncertain
         return {
@@ -273,8 +275,16 @@ def _call_azure_batch(prompt: str, expected_count: int, deployment: Optional[str
     url = f"{settings.AZURE_OPENAI_API_BASE.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version={settings.AZURE_OPENAI_API_VERSION}"
     
     payload = {
-        "messages": [{"role": "user", "content": prompt}],
-        "response_format": {"type": "json_object"},
+        "messages": [{
+            "role": "system",
+            "content": "You are a retail merchandising expert. Always respond with a valid JSON array only, no other text."
+        }, {
+            "role": "user",
+            "content": prompt
+        }],
+        # NOTE: Do NOT use response_format: json_object for batch calls.
+        # json_object mode forces a single root object, preventing the model
+        # from returning a bare JSON array of multiple items.
     }
     
     # GPT-5 models use different params
@@ -285,6 +295,7 @@ def _call_azure_batch(prompt: str, expected_count: int, deployment: Optional[str
         payload["max_completion_tokens"] = 300 * expected_count
     else:
         payload["temperature"] = 0.3
+        payload["max_tokens"] = 300 * expected_count
     
     try:
         response = requests.post(
@@ -295,7 +306,10 @@ def _call_azure_batch(prompt: str, expected_count: int, deployment: Optional[str
         )
         response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
-        return _parse_batch_json(content)
+        parsed = _parse_batch_json(content)
+        if not parsed:
+            print(f"  ⚠️ Azure batch: got response but parsed 0 items. Raw: {content[:300]}")
+        return parsed
     except Exception as e:
         print(f"  Azure batch error: {e}")
         return []
@@ -310,9 +324,12 @@ def _parse_batch_json(content: str) -> list:
         result = json.loads(content)
         if isinstance(result, list):
             return result
-        # Sometimes wrapped in {"results": [...]}
-        if isinstance(result, dict) and "results" in result:
-            return result["results"]
+        # Azure response_format: json_object forces LLM to wrap arrays
+        # in an object with arbitrary keys ("results", "items", "evaluations", etc.)
+        if isinstance(result, dict):
+            for value in result.values():
+                if isinstance(value, list):
+                    return value
         return []
     except json.JSONDecodeError:
         pass
@@ -431,6 +448,32 @@ def _call_litellm(prompt: str) -> dict:
     
     content = response.json()["choices"][0]["message"]["content"]
     return json.loads(content)
+
+
+def _call_local_llm(prompt: str) -> dict:
+    """Call generic local LLM (OpenAI compatible)."""
+    response = requests.post(
+        f"{settings.LOCAL_LLM_HOST.rstrip('/')}/chat/completions",
+        json={
+            "model": settings.LOCAL_LLM_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.3,
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+    
+    content = response.json()["choices"][0]["message"]["content"]
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        # Fallback for models that output markdown or extra text
+        import re
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            return json.loads(json_match.group())
+        raise
 
 
 def _call_athena(prompt: str) -> dict:
