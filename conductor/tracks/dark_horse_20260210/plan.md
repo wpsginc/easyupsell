@@ -14,7 +14,7 @@
 - [x] Task: Implement Local LLM Client Support [c2cd11a]
     - [ ] Extend `easyupsell/src/enrichment.py` or `config.py` to support a custom `local` provider URL (OpenAI-compatible).
     - [ ] Add config validation for local model endpoints.
-- [ ] Task: Create Brainstorming Prompt
+- [x] Task: Create Brainstorming Prompt [c205273]
     - [ ] Design the system prompt for "Concept Generation" (Input: Category Name -> Output: List of Concepts).
     - [ ] Implement the `brainstorm_concepts(category)` function.
     - [ ] Test with a local model mock or actual connection.
