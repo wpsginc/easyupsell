@@ -34,6 +34,31 @@ except ImportError:
 # LLM Integration
 # =============================================================================
 
+def call_llm_generic(prompt: str, provider: str = "openai") -> dict:
+    """
+    Generic call to LLM provider with a given prompt.
+    Expects JSON response.
+    """
+    if provider == "azure":
+        return _call_azure_openai(prompt)
+    elif provider == "gpt5-nano":
+        return _call_azure_openai(prompt, deployment="gpt-5-nano")
+    elif provider == "gpt5-mini":
+        return _call_azure_openai(prompt, deployment="gpt-5-mini")
+    elif provider == "openai":
+        return _call_openai(prompt)
+    elif provider == "ollama":
+        return _call_ollama(prompt)
+    elif provider == "litellm":
+        return _call_litellm(prompt)
+    elif provider == "athena":
+        return _call_athena(prompt)
+    elif provider == "local":
+        return _call_local_llm(prompt)
+    else:
+        raise ValueError(f"Unknown provider: {provider}")
+
+
 def get_llm_validation(
     source_category: str,
     target_category: str,
