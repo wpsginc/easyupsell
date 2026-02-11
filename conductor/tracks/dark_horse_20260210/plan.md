@@ -5,7 +5,7 @@
     - [ ] Create `easyupsell/commands/discover.py` with Typer skeleton.
     - [ ] Register command in `easyupsell/cli.py`.
     - [ ] Implement `--category` (single) and `--all` (batch) arguments.
-- [ ] Task: Implement Leaf Category Filter
+- [x] Task: Implement Leaf Category Filter [cbac70c]
     - [ ] Update `easyupsell/core/analyzer.py` or similar to support fetching ONLY leaf categories (categories with no children).
     - [ ] Write unit test ensuring parent categories are excluded.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
