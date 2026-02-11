@@ -10,15 +10,15 @@
     - [x] Write unit test ensuring parent categories are excluded.
 - [x] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
 
-## Phase 2: Generative Brainstorming (The "Dark Horse" Engine)
+## Phase 2: Generative Brainstorming (The "Dark Horse" Engine) [checkpoint: d823137]
 - [x] Task: Implement Local LLM Client Support [c2cd11a]
-    - [ ] Extend `easyupsell/src/enrichment.py` or `config.py` to support a custom `local` provider URL (OpenAI-compatible).
-    - [ ] Add config validation for local model endpoints.
+    - [x] Extend `easyupsell/src/enrichment.py` or `config.py` to support a custom `local` provider URL (OpenAI-compatible).
+    - [x] Add config validation for local model endpoints.
 - [x] Task: Create Brainstorming Prompt [c205273]
-    - [ ] Design the system prompt for "Concept Generation" (Input: Category Name -> Output: List of Concepts).
-    - [ ] Implement the `brainstorm_concepts(category)` function.
-    - [ ] Test with a local model mock or actual connection.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
+    - [x] Design the system prompt for "Concept Generation" (Input: Category Name -> Output: List of Concepts).
+    - [x] Implement the `brainstorm_concepts(category)` function.
+    - [x] Test with a local model mock or actual connection.
+- [x] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
 
 ## Phase 3: Inventory Matching & Scoring Logic
 - [ ] Task: Implement "Inventory Matcher"
