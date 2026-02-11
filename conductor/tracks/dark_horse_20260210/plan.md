@@ -1,14 +1,14 @@
 # Implementation Plan - Dark Horse Upsell Discovery
 
-## Phase 1: Core "Discover" Command Infrastructure
+## Phase 1: Core "Discover" Command Infrastructure [checkpoint: 409d6aa]
 - [x] Task: Create new CLI command `discover` [b336b0f]
-    - [ ] Create `easyupsell/commands/discover.py` with Typer skeleton.
-    - [ ] Register command in `easyupsell/cli.py`.
-    - [ ] Implement `--category` (single) and `--all` (batch) arguments.
+    - [x] Create `easyupsell/commands/discover.py` with Typer skeleton.
+    - [x] Register command in `easyupsell/cli.py`.
+    - [x] Implement `--category` (single) and `--all` (batch) arguments.
 - [x] Task: Implement Leaf Category Filter [cbac70c]
-    - [ ] Update `easyupsell/core/analyzer.py` or similar to support fetching ONLY leaf categories (categories with no children).
-    - [ ] Write unit test ensuring parent categories are excluded.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
+    - [x] Update `easyupsell/core/analyzer.py` or similar to support fetching ONLY leaf categories (categories with no children).
+    - [x] Write unit test ensuring parent categories are excluded.
+- [x] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
 
 ## Phase 2: Generative Brainstorming (The "Dark Horse" Engine)
 - [ ] Task: Implement Local LLM Client Support
