@@ -31,7 +31,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
 
 ## Phase 4: Output & Integration
-- [ ] Task: Implement CSV Writers
+- [x] Task: Implement CSV Writers [346a688]
     - [ ] Create `write_dark_horse_results(pairings)` for `data/dark_horse_pairings.csv`.
     - [ ] Create `write_catalog_gaps(gaps)` for `data/catalog_gaps.csv`.
     - [ ] Ensure headers match the specification.
