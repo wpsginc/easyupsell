@@ -11,7 +11,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1' (Protocol in workflow.md)
 
 ## Phase 2: Generative Brainstorming (The "Dark Horse" Engine)
-- [ ] Task: Implement Local LLM Client Support
+- [x] Task: Implement Local LLM Client Support [c2cd11a]
     - [ ] Extend `easyupsell/src/enrichment.py` or `config.py` to support a custom `local` provider URL (OpenAI-compatible).
     - [ ] Add config validation for local model endpoints.
 - [ ] Task: Create Brainstorming Prompt
