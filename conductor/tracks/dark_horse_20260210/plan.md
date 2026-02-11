@@ -30,12 +30,12 @@
     - [x] Integrate this step into the pipeline for *found* matches.
 - [x] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
 
-## Phase 4: Output & Integration
+## Phase 4: Output & Integration [checkpoint: 76c97d4]
 - [x] Task: Implement CSV Writers [346a688]
-    - [ ] Create `write_dark_horse_results(pairings)` for `data/dark_horse_pairings.csv`.
-    - [ ] Create `write_catalog_gaps(gaps)` for `data/catalog_gaps.csv`.
-    - [ ] Ensure headers match the specification.
+    - [x] Create `write_dark_horse_results(pairings)` for `data/dark_horse_pairings.csv`.
+    - [x] Create `write_catalog_gaps(gaps)` for `data/catalog_gaps.csv`.
+    - [x] Ensure headers match the specification.
 - [x] Task: End-to-End Testing [cb0f457]
-    - [ ] Run a dry run on a small subset (e.g., "Boots").
-    - [ ] Verify output file format and content quality.
-- [ ] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
+    - [x] Run a dry run on a small subset (e.g., "Boots").
+    - [x] Verify output file format and content quality.
+- [x] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
