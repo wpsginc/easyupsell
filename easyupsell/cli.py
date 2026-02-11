@@ -14,7 +14,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from easyupsell.commands import analyze, brands, config, export, review
+from easyupsell.commands import analyze, brands, config, discover, export, review
 
 # Main app with rich help
 app = typer.Typer(
@@ -30,6 +30,7 @@ console = Console()
 app.add_typer(analyze.app, name="analyze", help="Generate upsell recommendations")
 app.add_typer(brands.app, name="brands", help="Manage priority brand list")
 app.add_typer(config.app, name="config", help="Configure API connections")
+app.add_typer(discover.app, name="discover", help="Discover hidden inventory")
 app.add_typer(export.app, name="export", help="Export recommendations")
 app.add_typer(review.app, name="review", help="Review and approve recommendations")
 
