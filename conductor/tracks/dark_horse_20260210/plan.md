@@ -35,7 +35,7 @@
     - [ ] Create `write_dark_horse_results(pairings)` for `data/dark_horse_pairings.csv`.
     - [ ] Create `write_catalog_gaps(gaps)` for `data/catalog_gaps.csv`.
     - [ ] Ensure headers match the specification.
-- [ ] Task: End-to-End Testing
+- [x] Task: End-to-End Testing [cb0f457]
     - [ ] Run a dry run on a small subset (e.g., "Boots").
     - [ ] Verify output file format and content quality.
 - [ ] Task: Conductor - User Manual Verification 'Phase 4' (Protocol in workflow.md)
