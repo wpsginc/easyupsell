@@ -21,7 +21,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
 
 ## Phase 3: Inventory Matching & Scoring Logic
-- [ ] Task: Implement "Inventory Matcher"
+- [x] Task: Implement "Inventory Matcher" [3670c7b]
     - [ ] Create a utility that loads all category names into memory.
     - [ ] Implement fuzzy search (using `rapidfuzz` or `thefuzz`) to match "Concept" -> "Existing Category".
     - [ ] Return matches and "misses" (gaps).
