@@ -39,6 +39,7 @@ def run_analysis(
     sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
     from bigcommerce import BigCommerceClient
     from bigquery_client import BigQueryClient
+    from enrichment import EnrichmentService
     
     sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
     from validate_category_pairings import get_llm_validation
@@ -51,6 +52,10 @@ def run_analysis(
         raise RuntimeError(f"BigCommerce connection failed: {result.get('error')}")
     
     console.print(f"[green]✓[/green] Connected to: {result.get('store_name')}")
+    
+    # Load enrichment data
+    console.print("  [cyan]Loading enrichment data...[/cyan]")
+    enrichment_service = EnrichmentService()
     
     # Get category mappings
     cats = client.get_categories()
@@ -108,6 +113,7 @@ def run_analysis(
                 cat, high_value_items, id_to_name,
                 provider=provider,
                 max_items=items_per_category,
+                enrichment_service=enrichment_service,
             )
             
             all_recommendations.extend(recs)
@@ -124,6 +130,19 @@ def run_analysis(
         "total_count": len(all_recommendations),
         "output_path": output_path,
     }
+
+
+def get_all_leaf_categories(bc_client) -> list[dict]:
+    """Get all leaf categories (no children)."""
+    cats = bc_client.get_categories()
+    parent_ids = set(c.get("parent_id", 0) for c in cats)
+    
+    leaves = []
+    for c in cats:
+        if c["id"] not in parent_ids:
+            leaves.append(c)
+            
+    return leaves
 
 
 def get_top_categories_by_sales(bc_client, category_sales: dict, limit: int) -> list[dict]:
@@ -227,6 +246,7 @@ def find_recommendations_for_category(
     id_to_name: dict,
     provider: str = "azure",
     max_items: int = 8,
+    enrichment_service = None,
 ) -> list[dict]:
     """Find best item recommendations for a category."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
@@ -257,6 +277,11 @@ def find_recommendations_for_category(
     # Validate with LLM
     recommendations = []
     for item in selected:
+        # Get enrichment data
+        enrichment = None
+        if enrichment_service:
+            enrichment = enrichment_service.get_enrichment_for_category_pair(category_id, item["sku"])
+        
         try:
             result = get_llm_validation(category_name, item["name"], provider=provider)
         except Exception as e:
@@ -277,6 +302,9 @@ def find_recommendations_for_category(
             "item_orders_6mo": item["order_count"],
             "item_units_6mo": item["units_sold"],
             "item_revenue_6mo": item["revenue"],
+            "enrichment_copurchase_count": enrichment.get("copurchase_count", 0) if enrichment else 0,
+            "enrichment_margin": enrichment.get("rec_margin", 0) if enrichment else 0,
+            "enrichment_velocity": enrichment.get("rec_velocity", 0) if enrichment else 0,
             "llm_valid": result.get("valid"),
             "llm_confidence": result.get("confidence", 0),
             "relationship_type": result.get("relationship_type", ""),
@@ -298,6 +326,7 @@ def save_recommendations(recommendations: list[dict], output_path: Path):
         "recommended_sku", "recommended_netsuite_id", "same_category", "recommended_name", 
         "recommended_price", "recommended_categories",
         "item_orders_6mo", "item_units_6mo", "item_revenue_6mo",
+        "enrichment_copurchase_count", "enrichment_margin", "enrichment_velocity",
         "llm_valid", "llm_confidence", "relationship_type", "llm_reason",
     ]
     
