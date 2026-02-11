@@ -20,15 +20,15 @@
     - [x] Test with a local model mock or actual connection.
 - [x] Task: Conductor - User Manual Verification 'Phase 2' (Protocol in workflow.md)
 
-## Phase 3: Inventory Matching & Scoring Logic
+## Phase 3: Inventory Matching & Scoring Logic [checkpoint: 111b67b]
 - [x] Task: Implement "Inventory Matcher" [3670c7b]
-    - [ ] Create a utility that loads all category names into memory.
-    - [ ] Implement fuzzy search (using `rapidfuzz` or `thefuzz`) to match "Concept" -> "Existing Category".
-    - [ ] Return matches and "misses" (gaps).
+    - [x] Create a utility that loads all category names into memory.
+    - [x] Implement fuzzy search (using `rapidfuzz` or `thefuzz`) to match "Concept" -> "Existing Category".
+    - [x] Return matches and "misses" (gaps).
 - [x] Task: Implement Scoring/Reasoning [552ac85]
-    - [ ] Create the "Validation Prompt" (Input: Source Cat + Candidate Match -> Output: Score & Reason).
-    - [ ] Integrate this step into the pipeline for *found* matches.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
+    - [x] Create the "Validation Prompt" (Input: Source Cat + Candidate Match -> Output: Score & Reason).
+    - [x] Integrate this step into the pipeline for *found* matches.
+- [x] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
 
 ## Phase 4: Output & Integration
 - [ ] Task: Implement CSV Writers
