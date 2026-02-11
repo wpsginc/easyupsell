@@ -25,7 +25,7 @@
     - [ ] Create a utility that loads all category names into memory.
     - [ ] Implement fuzzy search (using `rapidfuzz` or `thefuzz`) to match "Concept" -> "Existing Category".
     - [ ] Return matches and "misses" (gaps).
-- [ ] Task: Implement Scoring/Reasoning
+- [x] Task: Implement Scoring/Reasoning [552ac85]
     - [ ] Create the "Validation Prompt" (Input: Source Cat + Candidate Match -> Output: Score & Reason).
     - [ ] Integrate this step into the pipeline for *found* matches.
 - [ ] Task: Conductor - User Manual Verification 'Phase 3' (Protocol in workflow.md)
