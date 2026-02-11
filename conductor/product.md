@@ -14,5 +14,6 @@ To solve the issue of sparse and noisy co-purchase data in e-commerce by impleme
 - **Category-First Recommendations:** Mapping relationships at the child and parent category levels.
 - **LLM Validation:** Automated filtering of nonsensical category pairings using large language models.
 - **Explicit Product Accessories:** High-priority, manual overrides for direct product-to-accessory mappings.
+- **Dark Horse Discovery:** Generative analysis to find hidden inventory and catalog gaps using "Concept-First" brainstorming.
 - **Integration Pipelines:** Scripts for exporting BigCommerce categories, fetching BigQuery enrichment data, and exporting recommendations to Peasisoft.
 - **Analysis Tools:** Identifying cross-sell gaps and analyzing order co-occurrence.
