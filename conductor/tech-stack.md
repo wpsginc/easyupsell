@@ -7,6 +7,7 @@
 - **Database:** BigQuery (Google Cloud)
 - **API Clients:** `requests` (BigCommerce), `openai` (LLM)
 - **Validation:** Pydantic
+- **Matching:** RapidFuzz (Fuzzy Search)
 - **Output:** CSV
 
 ## Infrastructure
