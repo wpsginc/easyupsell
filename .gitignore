@@ -44,3 +44,18 @@ dist/
 build/
 *.egg-info/
 .env.bak
+
+# Generated data output (Excel, CSV, SQLite)
+data/*.xlsx
+data/*.csv
+data/*.db
+data/*.log
+
+# Machine-specific config (secrets stay in .env)
+config.toml
+
+# OpenCode / Sisyphus agent plans
+.sisyphus/
+
+# LLM failure tracking
+data/llm_failures.log

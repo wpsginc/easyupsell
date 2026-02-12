@@ -11,6 +11,8 @@ Includes full business metrics for human review:
 Usage:
     python scripts/recommend_items_full.py --limit 50
     python scripts/recommend_items_full.py --top-categories 30 --items-per-category 8
+
+Output: Excel (.xlsx) with per-category tabs
 """
 
 import argparse
@@ -36,6 +38,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 from validate_category_pairings import get_llm_validation, get_batch_llm_validation
 
 console = Console()
+
+
+def _extract_netsuite_id(bpn: str) -> str:
+    """Extract NetSuite Internal ID from bin_picking_number (first comma-separated value)."""
+    if not bpn or not bpn.strip():
+        return ""
+    return bpn.split(",")[0].strip()
 
 def get_processed_categories(output_path: Path) -> set[str]:
     """Get list of categories already processed in the output CSV."""
@@ -215,6 +224,8 @@ def get_high_value_items_with_sales(
                 "order_count": sales.get("order_count", 0),
                 "units_sold": sales.get("units_sold", 0),
                 "revenue": round(sales.get("revenue", 0), 2),
+                # NetSuite ID from bin_picking_number (always on parent product)
+                "netsuite_id": _extract_netsuite_id(p.get("bin_picking_number", "")),
             }
             
             # Check if priority brand
@@ -347,7 +358,7 @@ def find_recommendations_for_category(
             "recommended_name": item["name"],
             "recommended_price": item["price"],
             "recommended_categories": " | ".join(filter(None, item_cat_names)),
-            "recommended_netsuite_id": stats.get("rec_netsuite_id"),
+            "recommended_netsuite_id": item.get("netsuite_id") or stats.get("rec_netsuite_id", ""),
             "same_category": item.get("same_category", False),
             
             # Item sales
@@ -374,7 +385,7 @@ def main():
     parser = argparse.ArgumentParser(description="Full recommendation analysis with sales data")
     parser.add_argument("--top-categories", type=int, default=20, help="Number of top categories by sales")
     parser.add_argument("--items-per-category", type=int, default=6, help="Candidate items per category")
-    parser.add_argument("--output", default=str(settings.DATA_DIR / "full_recommendations.csv"), help="Output CSV")
+    parser.add_argument("--output", default=str(settings.DATA_DIR / "full_historical_recommendations.xlsx"), help="Output Excel file")
     parser.add_argument("--provider", default=settings.DEFAULT_PROVIDER, help="LLM provider")
     parser.add_argument("--skip-orders", action="store_true", help="Skip order analysis (use random categories)")
     parser.add_argument("--use-bq", action="store_true", help="Use BigQuery for category ranking (FAST, recommended)")
@@ -420,7 +431,22 @@ def main():
                     'total_quantity': int(row['total_quantity'])
                 }
             print(f"  ✅ Loaded {len(category_sales)} categories from BigQuery")
-            item_sales, product_categories = {}, {}  # Not needed when using BQ
+            
+            # Also fetch item-level sales from BQ
+            try:
+                item_sales_df = bq_client.get_item_sales()
+                item_sales = {}
+                for _, row in item_sales_df.iterrows():
+                    item_sales[row['id']] = {
+                        'order_count': int(row['order_count']),
+                        'units_sold': int(row['units_sold']),
+                        'revenue': float(row['revenue']),
+                    }
+                print(f"  ✅ Loaded {len(item_sales)} item sales from BigQuery")
+            except Exception as e:
+                print(f"  ⚠️ Item sales BQ query failed: {e}")
+                item_sales = {}
+            product_categories = {}
         except Exception as e:
             print(f"  ⚠️ BigQuery failed: {e}")
             print("  Falling back to BC API...")
@@ -454,12 +480,14 @@ def main():
         use_cache=use_cache
     )
     
-    # Prepare output file
+    # Prepare output paths
+    # Intermediate CSV for resume capability, final Excel for delivery
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_path = output_path.with_suffix(".csv")  # Intermediate CSV
     
     # Check for existing work
-    processed_categories = get_processed_categories(output_path)
+    processed_categories = get_processed_categories(csv_path)
     if processed_categories:
         console.print(f"[yellow]Found {len(processed_categories)} already processed categories. Resuming...[/yellow]")
     
@@ -472,8 +500,8 @@ def main():
     ]
     
     # Write header if new file
-    if not output_path.exists():
-        with open(output_path, "w", newline="") as f:
+    if not csv_path.exists():
+        with open(csv_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
     
@@ -511,7 +539,7 @@ def main():
                 valid_count = sum(1 for r in recs if r["llm_valid"])
                 
                 # Append to CSV immediately
-                with open(output_path, "a", newline="") as f:
+                with open(csv_path, "a", newline="") as f:
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     for r in recs:
                         writer.writerow(r)
@@ -527,9 +555,115 @@ def main():
     # Summary
     # Note: all_recommendations only contains THIS run's items. 
     # To be accurate, we'd need to re-read the CSV.
-    console.print(f"\n✅ Run Complete. Output saved to: {output_path}")
+    
+    # Convert intermediate CSV to formatted Excel
+    excel_path = Path(args.output)
+    if excel_path.suffix != '.xlsx':
+        excel_path = excel_path.with_suffix('.xlsx')
+    
+    console.print(f"\n📊 Building Excel workbook...")
+    write_excel_output(csv_path, excel_path, fieldnames)
+    
+    console.print(f"\n✅ Run Complete.")
+    console.print(f"  Excel: {excel_path}")
+    console.print(f"  CSV:   {csv_path} (intermediate)")
     
     return 0
+
+
+def write_excel_output(csv_path: Path, excel_path: Path, fieldnames: list[str]):
+    """Convert intermediate CSV to a single formatted Excel workbook."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils import get_column_letter
+    
+    # Read all data from CSV
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        all_rows = list(reader)
+    
+    if not all_rows:
+        console.print("[yellow]No data to export[/yellow]")
+        return
+    
+    wb = Workbook()
+    
+    # Style definitions
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_font_white = Font(bold=True, size=11, color="FFFFFF")
+    valid_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+    invalid_fill = PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid")
+    
+    ws = wb.active
+    ws.title = "All Recommendations"
+    
+    # Headers
+    for col_idx, field in enumerate(fieldnames, 1):
+        cell = ws.cell(row=1, column=col_idx, value=field)
+        cell.font = header_font_white
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+    
+    # Data rows
+    for row_idx, row in enumerate(all_rows, 2):
+        for col_idx, field in enumerate(fieldnames, 1):
+            value = row.get(field, "")
+            # Convert numeric fields
+            if field in ("src_orders_6mo", "item_orders_6mo", "item_units_6mo", "copurchase_count"):
+                try:
+                    value = int(value) if value else 0
+                except (ValueError, TypeError):
+                    pass
+            elif field in ("src_revenue_6mo", "item_revenue_6mo", "recommended_price", "velocity_90d"):
+                try:
+                    value = float(value) if value else 0.0
+                except (ValueError, TypeError):
+                    pass
+            elif field in ("margin_pct", "llm_confidence"):
+                # Store as decimal, let Excel format as percentage
+                try:
+                    raw = float(value) if value else 0.0
+                    # llm_confidence comes as 0-100 from the LLM, convert to 0-1
+                    value = raw if raw <= 1.0 else raw / 100.0
+                except (ValueError, TypeError):
+                    value = 0.0
+            elif field == "llm_valid":
+                if value == "True":
+                    value = True
+                elif value == "False":
+                    value = False
+            
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            
+            # Apply percentage format for margin and confidence
+            if field in ("margin_pct", "llm_confidence"):
+                cell.number_format = '0%'
+        
+        # Row coloring: green for valid, RED for invalid
+        llm_valid = row.get("llm_valid", "")
+        if llm_valid == "True":
+            for col_idx in range(1, len(fieldnames) + 1):
+                ws.cell(row=row_idx, column=col_idx).fill = valid_fill
+        elif llm_valid == "False":
+            for col_idx in range(1, len(fieldnames) + 1):
+                ws.cell(row=row_idx, column=col_idx).fill = invalid_fill
+    
+    # Auto-width columns
+    for col_idx, field in enumerate(fieldnames, 1):
+        max_len = len(field)
+        for row_idx in range(2, min(len(all_rows) + 2, 50)):
+            cell_value = str(ws.cell(row=row_idx, column=col_idx).value or "")
+            max_len = max(max_len, min(len(cell_value), 40))
+        ws.column_dimensions[get_column_letter(col_idx)].width = max_len + 2
+    
+    # Freeze header row
+    ws.freeze_panes = "A2"
+    
+    wb.save(excel_path)
+    
+    categories = set(r.get("source_category", "") for r in all_rows)
+    invalid_count = sum(1 for r in all_rows if r.get("llm_valid") == "False")
+    console.print(f"  ✅ {len(all_rows)} recommendations ({len(categories)} categories, {invalid_count} invalid) → single workbook")
 
 
 if __name__ == "__main__":

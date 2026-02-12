@@ -1,27 +1,27 @@
 # Emilia Daily Report - 2026-02-09
 
-**Generated:** 08:54:08
+**Generated:** 12:12:56
 **Repository:** /home/vmlinux/srcwpsg/pim/easyupsell
 **Branch:** master
-**Total Duration:** 579.8s (parallel execution)
+**Total Duration:** 486.5s (parallel execution)
 
 ## Summary
 
 | Demon | Status | Duration | P0 | P1 |
 |-------|--------|----------|----|----|
-| chaos | ❌ FAILED | 0.0s | 0 | 0 |
-| concurrency | ❌ FAILED | 37.5s | 0 | 0 |
-| config | ❌ FAILED | 47.2s | 0 | 0 |
-| dependency | ❌ FAILED | 145.2s | 0 | 0 |
-| documentation | ❌ FAILED | 146.6s | 0 | 0 |
-| gap | ❌ FAILED | 0.0s | 0 | 0 |
-| hygiene | ❌ FAILED | 22.7s | 0 | 0 |
-| mcp | ❌ FAILED | 0.0s | 0 | 0 |
-| performance | ❌ FAILED | 0.0s | 0 | 0 |
-| security | ❌ FAILED | 0.0s | 0 | 0 |
-| testing | ❌ FAILED | 0.0s | 0 | 0 |
-| uat | ✅ SUCCESS | 78.6s | 0 | 0 |
-| upgrade | ❌ FAILED | 102.0s | 0 | 0 |
+| chaos | ❌ FAILED | 23.5s | 0 | 0 |
+| concurrency | ❌ FAILED | 36.3s | 0 | 0 |
+| config | ❌ FAILED | 21.5s | 0 | 0 |
+| dependency | ❌ FAILED | 22.6s | 0 | 0 |
+| documentation | ❌ FAILED | 17.6s | 0 | 0 |
+| gap | ❌ FAILED | 24.8s | 0 | 0 |
+| hygiene | ❌ FAILED | 20.1s | 0 | 0 |
+| mcp | ❌ FAILED | 50.3s | 0 | 0 |
+| performance | ❌ FAILED | 33.9s | 0 | 0 |
+| security | ❌ FAILED | 155.8s | 0 | 0 |
+| testing | ❌ FAILED | 36.2s | 0 | 0 |
+| uat | ❌ FAILED | 21.1s | 0 | 0 |
+| upgrade | ❌ FAILED | 22.7s | 0 | 0 |
 
 **Total Issues:** P0=0, P1=0
 

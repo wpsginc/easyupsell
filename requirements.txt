@@ -14,4 +14,7 @@ openpyxl>=3.1.0
 pytest>=7.0.0
 
 # Linting
-ruff>=0.1.0rapidfuzz>=3.0.0
+ruff>=0.1.0
+
+# Matching / Fuzzy Search
+rapidfuzz>=3.0.0

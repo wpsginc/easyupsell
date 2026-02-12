@@ -34,10 +34,12 @@ except ImportError:
 # LLM Integration
 # =============================================================================
 
-def call_llm_generic(prompt: str, provider: str = "openai") -> dict:
+def call_llm_generic(prompt: str, provider: str = "openai", raw: bool = False):
     """
     Generic call to LLM provider with a given prompt.
-    Expects JSON response.
+    
+    If raw=False (default): expects JSON response, returns dict.
+    If raw=True: returns raw text string (no JSON constraint).
     """
     if provider == "azure":
         return _call_azure_openai(prompt)
@@ -52,7 +54,7 @@ def call_llm_generic(prompt: str, provider: str = "openai") -> dict:
     elif provider == "litellm":
         return _call_litellm(prompt)
     elif provider == "athena":
-        return _call_athena(prompt)
+        return _call_athena(prompt, raw=raw)
     elif provider == "local":
         return _call_local_llm(prompt)
     else:
@@ -501,49 +503,79 @@ def _call_local_llm(prompt: str) -> dict:
         raise
 
 
-def _call_athena(prompt: str) -> dict:
-    """Call GPT-OSS 120B on Athena (local inference, FREE!)."""
-    # Simplified prompt for better JSON response
+def _call_athena(prompt: str, raw: bool = False):
+    """Call local model on Athena (OpenAI-compatible, FREE!).
+    
+    If raw=False: returns parsed JSON dict (with retry on failure).
+    If raw=True: returns raw text string (no JSON constraint, max domain knowledge).
+    """
+    import re
+    
+    def _send_to_athena(messages: list, json_mode: bool = True) -> str:
+        """Send messages to Athena, return raw content string."""
+        payload = {
+            "model": "gpt-oss-120b",
+            "messages": messages,
+            "temperature": 0.3,
+            "max_tokens": 500,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+        
+        response = requests.post(
+            f"{settings.ATHENA_HOST}/v1/chat/completions",
+            headers={"Content-Type": "application/json"},
+            json=payload,
+            timeout=180,
+        )
+        response.raise_for_status()
+        msg = response.json()["choices"][0]["message"]
+        content = msg.get("content", "")
+        if not content and msg.get("reasoning_content"):
+            content = msg.get("reasoning_content", "")
+        return content.strip()
+    
+    # === Raw text mode (Pass 1 of 2-pass brainstorm) ===
+    if raw:
+        messages = [{"role": "user", "content": prompt}]
+        return _send_to_athena(messages, json_mode=False)
+    
+    # === JSON mode with retry ===
+    def _extract_json(content: str) -> dict:
+        """Try to extract JSON from a response string."""
+        if content.startswith("```"):
+            lines = content.split("\n")
+            content = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            pass
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            return json.loads(json_match.group())
+        raise json.JSONDecodeError("No JSON found", content, 0)
+    
     simple_prompt = f"""{prompt}
 
-CRITICAL: Output ONLY valid JSON with these exact fields:
-{{"valid": true/false, "confidence": 0.0-1.0, "reason": "one line", "relationship_type": "accessory|complementary|unrelated", "suggested_weight": 50}}"""
+CRITICAL: Output ONLY valid JSON. No markdown, no explanation, no code fences."""
     
-    # GPT-OSS uses OpenAI-compatible API
-    response = requests.post(
-        f"{settings.ATHENA_HOST}/v1/chat/completions",
-        headers={"Content-Type": "application/json"},
-        json={
-            "model": "gpt-oss-120b",
-            "messages": [{"role": "user", "content": simple_prompt}],
-            "temperature": 0.3,
-            "max_tokens": 300,  # Needs room for reasoning + output
-        },
-        timeout=180,  # Local model can be slower
-    )
-    response.raise_for_status()
+    messages = [{"role": "user", "content": simple_prompt}]
+    raw_content = _send_to_athena(messages, json_mode=True)
     
-    msg = response.json()["choices"][0]["message"]
-    content = msg.get("content", "")
+    try:
+        return _extract_json(raw_content)
+    except (json.JSONDecodeError, ValueError):
+        pass
     
-    # GPT-OSS might put reasoning in separate field, content has the answer
-    if not content and msg.get("reasoning_content"):
-        # Model still thinking, try extracting from reasoning
-        content = msg.get("reasoning_content", "")
+    # Retry — send it back to its room with a nudge
+    messages.append({"role": "assistant", "content": raw_content})
+    messages.append({"role": "user", "content": 
+        "Your previous response was NOT valid JSON. "
+        "Output ONLY a raw JSON object, nothing else. No markdown, no explanation."
+    })
     
-    # Find JSON in the response
-    import re
-    json_match = re.search(r'\{[^{}]*"valid"[^{}]*\}', content, re.DOTALL)
-    if json_match:
-        return json.loads(json_match.group())
-    
-    # Try to parse the whole content as JSON
-    content = content.strip()
-    if content.startswith("```"):
-        lines = content.split("\n")
-        content = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-    
-    return json.loads(content)
+    raw2 = _send_to_athena(messages, json_mode=True)
+    return _extract_json(raw2)
 
 
 # =============================================================================

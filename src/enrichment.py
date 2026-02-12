@@ -68,3 +68,13 @@ class EnrichmentService:
             if c.get("rec_sku") == target_sku:
                 return c
         return None
+
+    def get_enrichment_for_category_pair(self, category_id: int, target_sku: str) -> Optional[Dict[str, Any]]:
+        """
+        Find specific co-purchase stats for a Category -> Target pair.
+        """
+        candidates = self.category_map.get(category_id, [])
+        for c in candidates:
+            if c.get("rec_sku") == target_sku:
+                return c
+        return None

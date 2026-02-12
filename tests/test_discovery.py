@@ -16,8 +16,9 @@ def test_brainstorm_concepts():
     with patch("easyupsell.core.discovery.call_llm_generic") as mock_call:
         mock_call.return_value = mock_llm_response
         
-        concepts = brainstorm_concepts("Tactical Boots", provider="local")
+        concepts, error = brainstorm_concepts("Tactical Boots", provider="local")
         
+        assert error is None
         assert len(concepts) == 3
         assert "Socks" in concepts
         assert "Laces" in concepts
@@ -31,7 +32,7 @@ def test_discover_dark_horses():
     """Test full discovery pipeline."""
     # Mock brainstorm response
     with patch("easyupsell.core.discovery.brainstorm_concepts") as mock_brainstorm:
-        mock_brainstorm.return_value = ["Socks", "Spaceship"]
+        mock_brainstorm.return_value = (["Socks", "Spaceship"], None)
         
         # Mock Inventory Matcher
         # We need to ensure discover_dark_horses instantiates InventoryMatcher

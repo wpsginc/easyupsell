@@ -10,7 +10,7 @@ from bigcommerce import BigCommerceClient
 
 from easyupsell.core.analyzer import get_all_leaf_categories
 from easyupsell.core.discovery import discover_dark_horses
-from easyupsell.core.output import write_dark_horse_results, write_catalog_gaps
+from easyupsell.core.output import write_dark_horse_results, write_catalog_gaps, write_dark_horse_excel
 
 app = typer.Typer(help="Discover hidden inventory")
 console = Console()
@@ -70,6 +70,7 @@ def discover(
     # 4. Run Analysis
     all_pairings = []
     all_gaps = []
+    all_failures = []
 
     with Progress(
         SpinnerColumn(),
@@ -81,29 +82,13 @@ def discover(
         for target in targets:
             progress.update(task, description=f"Analyzing {target}...")
             
-            # Use local provider if not specified otherwise in config, 
-            # but CLI argument can override config? 
-            # Currently logic uses 'local' as default in discover_dark_horses signature.
-            # If user passes --model, we might want to pass that as provider or model?
-            # The signature is `provider`.
-            # If user says --model "gpt-4", maybe they mean provider="openai"?
-            # For now, let's assume `model` arg maps to `provider` arg in discovery.
-            # Or use 'local' and let config handle model.
-            
-            provider_arg = "local" # Default for this command per spec Phase 2 Task 2?
-            # Spec says "Implement Local LLM Client Support".
-            # CLI says --model.
-            # Let's pass the cli arg `model` as `provider` to `discover_dark_horses` 
-            # if it matches one of our providers, else assume it's a model name for local?
-            # Actually, `discover_dark_horses` takes `provider`.
-            # Let's use `model` arg as `provider` for now to be simple, or "local" if default.
-            
             p_arg = "local" if model == "default" else model
             
             results = discover_dark_horses(target, all_cat_names, provider=p_arg)
             
             all_pairings.extend(results["pairings"])
             all_gaps.extend(results["gaps"])
+            all_failures.extend(results.get("failures", []))
             
             progress.advance(task)
 
@@ -117,13 +102,28 @@ def discover(
         console.print(f"Gaps found: {len(all_gaps)}")
         for g in all_gaps[:5]:
             console.print(f"  {g['source']} missing {g['missing_concept']}")
+        
+        if all_failures:
+            console.print(f"\n[red]Failures: {len(all_failures)}[/red]")
+            for f in all_failures[:5]:
+                console.print(f"  [red]✗[/red] {f['category']} ({f['stage']}): {f['error'][:80]}")
     else:
         output_dir = Path("data")
+        
+        # Intermediate CSVs
         pairings_file = output_dir / "dark_horse_pairings.csv"
         gaps_file = output_dir / "catalog_gaps.csv"
-        
         write_dark_horse_results(all_pairings, pairings_file)
         write_catalog_gaps(all_gaps, gaps_file)
         
-        console.print(f"\n[green]✓[/green] Saved {len(all_pairings)} pairings to {pairings_file}")
-        console.print(f"[green]✓[/green] Saved {len(all_gaps)} gaps to {gaps_file}")
+        # Formatted Excel workbook
+        excel_file = output_dir / "dark_horse_discovery.xlsx"
+        write_dark_horse_excel(all_pairings, all_gaps, excel_file, failures=all_failures)
+        
+        console.print(f"\n[green]✓[/green] Saved {len(all_pairings)} pairings + {len(all_gaps)} gaps")
+        if all_failures:
+            console.print(f"[red]✗[/red] {len(all_failures)} failures (see Failures sheet)")
+        console.print(f"  Excel: {excel_file}")
+        console.print(f"  CSV:   {pairings_file} (intermediate)")
+        console.print(f"  CSV:   {gaps_file} (intermediate)")
+

@@ -108,3 +108,30 @@ def test_original_items_not_mutated():
     items = [_make_item("Helmet Light", [100])]
     filter_candidates(cat, items)
     assert "same_category" not in items[0], "filter_candidates mutated the original item dict"
+
+
+def test_reproduction_same_category_filtering():
+    """
+    Reproduction: Confirm that products in the same category ARE currently filtered out
+    (unless they are whitelisted or logic is already permissive).
+    
+    The goal of the track is to REMOVE this restriction.
+    So initially, we expect this test to FAIL if the filter is already permissive,
+    or PASS if the filter IS working (blocking the items).
+    
+    Wait, the spec says: "The current recommendation engine proactively filters out candidate products that belong to the same category".
+    
+    Let's check the current behavior. If I add a test asserting that same-cat items ARE returned,
+    it should FAIL if the filter is active.
+    """
+    cat = _make_category(100, "Fire Helmets")
+    # Item in the same category (100)
+    items = [_make_item("Helmet Light", [100])]
+    
+    # We want this to return 1 item eventually. 
+    # If the bug (feature to be changed) exists, this might return 0.
+    result = filter_candidates(cat, items)
+    
+    # For TDD Red Phase: Assert that we get the item back.
+    # If the code currently blocks it, this assertion will fail.
+    assert len(result) == 1, "Expected same-category item to be returned, but it was filtered out."
