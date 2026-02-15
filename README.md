@@ -27,19 +27,23 @@ pip install -r requirements.txt
 cp .env.template .env   # Add BC + LLM credentials
 
 # Analysis pipeline
-python scripts/export_categories.py                    # Get category tree
-python scripts/validate_category_pairings.py          # LLM validates pairings
-python scripts/product_accessories.py --validate      # Product-level overrides
+easyupsell analyze              # Generate upsell recommendations
+easyupsell review               # Review and approve recommendations
+easyupsell export               # Export recommendations to formats
 ```
 
-## Scripts
+## CLI Commands
 
-| Script | Purpose |
-|--------|---------|
-| `validate_category_pairings.py` | LLM validates child category pairings |
-| `product_accessories.py` | Explicit product→accessory mappings |
-| `analyze_bc_orders.py` | Find cross-sell gaps (products bought alone) |
-| `export_categories.py` | Export BC category structure |
+Run `easyupsell --help` to see all available commands.
+
+| Command | Purpose |
+|---------|---------|
+| `easyupsell analyze` | Generate upsell recommendations with LLM validation |
+| `easyupsell review` | Review and approve recommendations |
+| `easyupsell export` | Export recommendations to various formats |
+| `easyupsell brands` | Manage priority brand list |
+| `easyupsell discover` | Discover hidden inventory |
+| `easyupsell config` | Configure API connections |
 
 ## LLM Providers
 
@@ -50,17 +54,8 @@ Configure in `.env`:
 
 ## Customizing
 
-### Product Accessories
-Edit `scripts/product_accessories.py`:
-```python
-PRODUCT_ACCESSORIES = [
-    ("RADIO-*", "RADIO-STRAP-*", 90, "Radio requires strap"),
-    ("HELMET-FIRE-*", "HELMET-SHIELD-*", 90, "Face shield"),
-]
-```
-
 ### Category Validation Prompt
-The LLM prompt in `validate_category_pairings.py` understands:
+The LLM prompt in validation understands:
 - Safety/tactical/industrial supplies context
 - Filters unrelated pairings (helmet + magazine = reject)
 - Suggests weights based on relationship type
