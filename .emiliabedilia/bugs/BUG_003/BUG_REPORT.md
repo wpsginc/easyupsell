@@ -1,6 +1,6 @@
-# BUG_003: Enrichment Service Disconnected
+# BUG_003: CLI entry point script calls main() requiring ctx argument but installed as zero-arg callable
 **Severity:** P0
-**Source Demon:** gap
-**File:** easyupsell/core/analyzer.py
-**Description:** EnrichmentService never instantiated, ignoring enrichment data from BigQuery
+**Source Demon:** bedilia_critic
+**File:** Unknown
+**Description:** CLI entry point script calls main() requiring ctx argument but installed as zero-arg callable
 **Repository:** /home/vmlinux/srcwpsg/pim/easyupsell

@@ -1,6 +1,6 @@
-# BUG_010: Hardcoded SQL Table Names
-**Severity:** P2
+# BUG_010: NetSuite OAuth signature validation untested - authentication bypass risk
+**Severity:** P0
 **Source Demon:** gap
-**File:** src/bigquery_client.py
-**Description:** Table name bc_native.bc_order_line_items hardcoded instead of config
+**File:** Unknown
+**Description:** NetSuite OAuth signature validation untested - authentication bypass risk
 **Repository:** /home/vmlinux/srcwpsg/pim/easyupsell

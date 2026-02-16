@@ -1,6 +1,6 @@
-# BUG_005: BigQuery Client Missing Error Handling
-**Severity:** P1
-**Source Demon:** gap
-**File:** src/bigquery_client.py
-**Description:** No error handling for network/auth failures, crashes on transient BQ errors
+# BUG_005: CLI entry point failure - README instructs pip install but doesn't install package itself
+**Severity:** P0
+**Source Demon:** bedilia_planner
+**File:** Unknown
+**Description:** CLI entry point failure - README instructs pip install but doesn't install package itself
 **Repository:** /home/vmlinux/srcwpsg/pim/easyupsell

@@ -1,6 +1,6 @@
-# BUG_008: Print Instead of Logging
-**Severity:** P2
-**Source Demon:** gap
-**File:** src/enrichment.py
-**Description:** Using print() instead of proper logging module
+# BUG_008: SQLite cache race conditions - no WAL mode, no connection pooling, TOCTOU bugs
+**Severity:** P0
+**Source Demon:** concurrency
+**File:** Unknown
+**Description:** SQLite cache race conditions - no WAL mode, no connection pooling, TOCTOU bugs
 **Repository:** /home/vmlinux/srcwpsg/pim/easyupsell

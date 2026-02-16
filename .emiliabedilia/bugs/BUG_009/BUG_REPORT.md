@@ -1,6 +1,6 @@
-# BUG_009: Print Instead of Logging in fetch script
-**Severity:** P2
-**Source Demon:** gap
-**File:** scripts/fetch_bq_enrichment.py
-**Description:** Using print() instead of proper logging module
+# BUG_009: No BigCommerce API rate limiting - 150 req/min limit will be exceeded
+**Severity:** P0
+**Source Demon:** concurrency
+**File:** Unknown
+**Description:** No BigCommerce API rate limiting - 150 req/min limit will be exceeded
 **Repository:** /home/vmlinux/srcwpsg/pim/easyupsell

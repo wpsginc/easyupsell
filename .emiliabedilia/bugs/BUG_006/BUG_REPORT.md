@@ -1,6 +1,6 @@
-# BUG_006: Broken Link to tracks.md
-**Severity:** P2
-**Source Demon:** documentation
-**File:** conductor/index.md
-**Description:** Link to tracks.md points to non-existent file
+# BUG_006: Enrichment service disconnected - no user feedback when data missing
+**Severity:** P0
+**Source Demon:** bedilia_planner
+**File:** Unknown
+**Description:** Enrichment service disconnected - no user feedback when data missing
 **Repository:** /home/vmlinux/srcwpsg/pim/easyupsell

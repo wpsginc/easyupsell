@@ -1,6 +1,6 @@
-# BUG_002: CLI Entry Point Failure
+# BUG_002: Stale entry point installation - Bedilia fixes not applied
 **Severity:** P0
-**Source Demon:** documentation
-**File:** pyproject.toml
-**Description:** Main entry point easyupsell not installed when using requirements.txt
+**Source Demon:** testing
+**File:** Unknown
+**Description:** Stale entry point installation - Bedilia fixes not applied
 **Repository:** /home/vmlinux/srcwpsg/pim/easyupsell

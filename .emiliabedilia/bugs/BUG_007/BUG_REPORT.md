@@ -1,6 +1,6 @@
-# BUG_007: Broken Link to tracks Directory
-**Severity:** P2
-**Source Demon:** documentation
-**File:** conductor/index.md
-**Description:** Link to tracks/ directory points to non-existent directory
+# BUG_007: NetSuite credentials in .env.template but not loaded in Settings class (5 variables)
+**Severity:** P0
+**Source Demon:** config
+**File:** Unknown
+**Description:** NetSuite credentials in .env.template but not loaded in Settings class (5 variables)
 **Repository:** /home/vmlinux/srcwpsg/pim/easyupsell
