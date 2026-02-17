@@ -47,13 +47,13 @@ A **merchandising intelligence tool** — not an IT tool. Built for merchandiser
 ### 2.2 LLM Review Pass
 - [x] Post-processing review command (`easyupsell review`) — batch-score pairings 1-5 with a second model
 - [x] Separate keeps/rejects into green/red Excel sheets
-- [ ] **Restartable long-running processes** — checkpoint scored results every N pairings to disk (JSON or partial Excel) so interrupted runs can resume from last checkpoint instead of restarting from scratch
-- [ ] Resume flag: `easyupsell review --resume` picks up from last checkpoint file
+- [x] **Restartable long-running processes** — checkpoint scored results every N pairings to disk (JSON) so interrupted runs can resume from last checkpoint instead of restarting from scratch
+- [x] Resume flag: `easyupsell review --resume` picks up from last checkpoint file
 
 ### 2.3 Output
 - [x] Separate "Dark Horse" sheet/report in Excel (pairings + gaps + failures)
-- [ ] Include SKU, current sales velocity, margin, and LLM reasoning for why it should pair
-- [ ] Flag items with high margin + zero copurchase as highest-priority opportunities
+- [x] Include SKU, current sales velocity, margin, copurchase count, and LLM reasoning for why it should pair
+- [x] Flag items with high margin + zero copurchase as highest-priority opportunities (gold ★ rows)
 
 ---
 
@@ -139,16 +139,48 @@ PRE is a **decision-support tool**, not an autonomous agent. AI surfaces candida
 
 ---
 
-## Current Status (2026-02-11)
+## Phase 6: Historical Product-to-Product Recommendations (Future)
 
-**Full Production Run Complete:**
+SKU-level "customers who bought X also bought Y" using real transaction data.
+
+### 6.1 Data Foundation
+- [ ] BQ query: co-purchase pairs from order history (orders containing ≥2 distinct SKUs)
+- [ ] Frequency + recency weighting (recent co-purchases count more)
+- [ ] Filter noise: exclude same-category duplicates, bundles, bulk reorders
+
+### 6.2 Recommendation Engine
+- [ ] For each SKU, rank top N co-purchased SKUs by weighted frequency
+- [ ] Merge with margin/velocity enrichment data to prioritize high-value pairs
+- [ ] LLM sanity check: batch-validate top pairs make merchandising sense (catch data artifacts)
+
+### 6.3 Output
+- [ ] Product-to-product recommendation report (SKU A → SKU B, co-purchase count, confidence)
+- [ ] Complement existing category-level recommendations with SKU-level precision
+- [ ] Feed into BigCommerce Related Products API for automated upsell widgets
+
+### 6.4 How This Differs from Phases 1–3
+Phases 1–3 are **concept-driven** (LLM brainstorms what *should* pair based on merchandising logic). Phase 6 is **data-driven** (what customers *actually* buy together). Best results come from combining both: concept-driven discovery surfaces novel pairings, historical data validates and ranks them.
+
+---
+
+## Current Status (2026-02-16)
+
+**Phase 1 (CLI Foundation): ✅ Complete**
 - 8,346 recommendations across 758 categories
-- 4,179 valid (50%), 4,167 invalid (50%) — all kept with red/green highlighting
-- 100% data quality: item sales, NetSuite ID, margin, velocity all populated
-- Output: `data/full_historical_recommendations.xlsx` (1.1 MB, single workbook)
-- Cost: ~$13.50 on GPT-5.2 for full catalog run
+- Output: `data/full_historical_recommendations.xlsx`
+
+**Phase 2 (Dark Horse): ✅ Complete**
+- 8,067 pairings with LLM review scoring
+- Checkpoint/resume for interrupted runs
+- Enriched output: SKU, margin, velocity, copurchase, high-priority flag
+- Output: `data/dark_horse_discovery_glm_q8_reviewed.xlsx`
+
+**Phase 3 (Opportunities): ✅ Pipeline Built**
+- 1,647 unique product types from 4,314 catalog gaps
+- CLI: `easyupsell opportunities` (with `--skip-llm` for instant output)
+- Output: `data/new_product_opportunities.xlsx`
 
 **Next Steps:**
-1. Phase 2: Dark Horse item analysis (hidden inventory)
-2. Phase 3: Opportunity add-on suggestions (new product sourcing)
-3. Phase 4: NetSuite queryable API integration
+1. LLM-enrich the opportunities report (descriptions, prices, priority)
+2. Phase 4: NetSuite queryable API integration
+3. Phase 6: Historical product-to-product recommendations

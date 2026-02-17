@@ -13,7 +13,7 @@ def test_brainstorm_concepts():
         ]
     }
     
-    with patch("easyupsell.core.discovery.call_llm_generic") as mock_call:
+    with patch("pre.core.discovery.call_llm_generic") as mock_call:
         mock_call.return_value = mock_llm_response
         
         concepts, error = brainstorm_concepts("Tactical Boots", provider="local")
@@ -31,7 +31,7 @@ def test_brainstorm_concepts():
 def test_discover_dark_horses():
     """Test full discovery pipeline."""
     # Mock brainstorm response
-    with patch("easyupsell.core.discovery.brainstorm_concepts") as mock_brainstorm:
+    with patch("pre.core.discovery.brainstorm_concepts") as mock_brainstorm:
         mock_brainstorm.return_value = (["Socks", "Spaceship"], None)
         
         # Mock Inventory Matcher
@@ -43,7 +43,7 @@ def test_discover_dark_horses():
         # "Socks" -> "Wool Socks" (Match) -> Validate -> True
         # "Spaceship" -> No Match -> Gap
         
-        with patch("easyupsell.core.discovery.get_llm_validation") as mock_validate:
+        with patch("pre.core.discovery.get_llm_validation") as mock_validate:
             mock_validate.return_value = {
                 "valid": True,
                 "confidence": 0.9,

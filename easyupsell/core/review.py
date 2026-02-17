@@ -10,8 +10,11 @@ that generated the pairings. E.g. GLM brainstorms → GPT-OSS reviews.
 
 import sys
 import json
+import logging
 from pathlib import Path
 from typing import List, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 from validate_category_pairings import call_llm_generic
@@ -112,22 +115,75 @@ For each pairing, output:
     return scored
 
 
+def save_checkpoint(scored: List[Dict], next_index: int, checkpoint_path: Path):
+    """Save review progress to a JSON checkpoint file."""
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    data = {"scored": scored, "next_index": next_index}
+    # Write to temp file first, then rename for atomicity
+    tmp_path = checkpoint_path.with_suffix(".tmp")
+    with open(tmp_path, "w") as f:
+        json.dump(data, f)
+    tmp_path.rename(checkpoint_path)
+    logger.debug(f"Checkpoint saved: {len(scored)} scored, next_index={next_index}")
+
+
+def load_checkpoint(checkpoint_path: Path) -> tuple:
+    """Load review progress from a JSON checkpoint file.
+    
+    Returns:
+        (scored_list, next_index) or ([], 0) if no checkpoint exists.
+    """
+    if not checkpoint_path.exists():
+        return [], 0
+    
+    with open(checkpoint_path, "r") as f:
+        data = json.load(f)
+    
+    scored = data.get("scored", [])
+    next_index = data.get("next_index", 0)
+    logger.debug(f"Checkpoint loaded: {len(scored)} scored, next_index={next_index}")
+    return scored, next_index
+
+
 def review_all_pairings(
     pairings: List[Dict],
     provider: str = "athena",
     batch_size: int = 15,
     progress_callback=None,
+    checkpoint_path: Optional[Path] = None,
+    resume: bool = False,
 ) -> List[Dict]:
-    """Review all pairings in batches. Returns scored pairings."""
-    all_scored = []
+    """Review all pairings in batches. Returns scored pairings.
     
-    for i in range(0, len(pairings), batch_size):
+    Args:
+        checkpoint_path: Path for checkpoint file. If None, no checkpointing.
+        resume: If True and checkpoint exists, resume from last checkpoint.
+    """
+    all_scored = []
+    start_index = 0
+    
+    # Resume from checkpoint if requested
+    if resume and checkpoint_path:
+        all_scored, start_index = load_checkpoint(checkpoint_path)
+        if all_scored:
+            logger.info(f"Resuming from checkpoint: {len(all_scored)} already scored, starting at index {start_index}")
+    
+    for i in range(start_index, len(pairings), batch_size):
         batch = pairings[i:i + batch_size]
         scored = review_batch(batch, provider=provider)
         all_scored.extend(scored)
         
+        # Save checkpoint after each batch
+        if checkpoint_path:
+            save_checkpoint(all_scored, i + len(batch), checkpoint_path)
+        
         if progress_callback:
             progress_callback(len(all_scored), len(pairings))
+    
+    # Clean up checkpoint on successful completion
+    if checkpoint_path and checkpoint_path.exists():
+        checkpoint_path.unlink()
+        logger.debug("Checkpoint removed after successful completion")
     
     return all_scored
 
@@ -147,7 +203,7 @@ def write_reviewed_excel(
       - 'Catalog Gaps' — gaps (unchanged from discovery)
     """
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from openpyxl.utils import get_column_letter
 
     excel_path.parent.mkdir(parents=True, exist_ok=True)
@@ -158,15 +214,21 @@ def write_reviewed_excel(
     keep_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
     reject_fill = PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid")
     gap_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    priority_fill = PatternFill(start_color="FFD700", end_color="FFD700", fill_type="solid")
 
     fields = [
         "source_category",
         "target_category",
+        "target_sku",
         "concept_matched",
         "match_confidence",
         "relationship_type",
+        "sales_velocity",
+        "margin_pct",
+        "copurchase_count",
         "relevance_score",
         "review_note",
+        "high_priority",
     ]
 
     # Split into keeps and rejects
@@ -184,6 +246,8 @@ def write_reviewed_excel(
             cell.alignment = Alignment(horizontal="center")
 
         for row_idx, p in enumerate(data, 2):
+            is_priority = p.get("high_priority", False)
+            row_fill = priority_fill if is_priority else fill
             for col_idx, field in enumerate(sheet_fields, 1):
                 value = p.get(field, "")
                 if field == "match_confidence":
@@ -191,10 +255,19 @@ def write_reviewed_excel(
                         value = float(value) if value else 0.0
                     except (ValueError, TypeError):
                         value = 0.0
+                elif field == "margin_pct":
+                    try:
+                        value = float(value) if value else 0.0
+                    except (ValueError, TypeError):
+                        value = 0.0
+                elif field == "high_priority":
+                    value = "★" if value else ""
                 cell = ws.cell(row=row_idx, column=col_idx, value=value)
-                cell.fill = fill
+                cell.fill = row_fill
                 if field == "match_confidence":
                     cell.number_format = '0%'
+                elif field == "margin_pct":
+                    cell.number_format = '0.0%'
 
         for col_idx in range(1, len(sheet_fields) + 1):
             col_letter = get_column_letter(col_idx)

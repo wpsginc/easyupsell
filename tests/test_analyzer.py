@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 
-# Add src and easyupsell to path
+# Add src and pre to path
 root = Path(__file__).parent.parent
 sys.path.insert(0, str(root))
 sys.path.insert(0, str(root / "src"))

@@ -2,23 +2,23 @@
 EasyUpsell CLI - Main entry point.
 
 Usage:
-    easyupsell analyze              # Analyze top categories
-    easyupsell analyze --all        # Full catalog
-    easyupsell review               # Review recommendations
-    easyupsell export               # Export to formats
-    easyupsell brands               # Manage priority brands
-    easyupsell config               # Configure API keys
+    pre analyze              # Analyze top categories
+    pre analyze --all        # Full catalog
+    pre review               # Review recommendations
+    pre export               # Export to formats
+    pre brands               # Manage priority brands
+    pre config               # Configure API keys
 """
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from easyupsell.commands import analyze, brands, config, discover, export, review
+from easyupsell.commands import analyze, brands, config, discover, export, opportunities, review
 
 # Main app with rich help
 app = typer.Typer(
-    name="easyupsell",
+    name="pre",
     help="AI-powered upsell recommendation engine for BigCommerce.",
     add_completion=True,
     rich_markup_mode="rich",
@@ -32,6 +32,7 @@ app.add_typer(brands.app, name="brands", help="Manage priority brand list")
 app.add_typer(config.app, name="config", help="Configure API connections")
 app.add_typer(discover.app, name="discover", help="Discover hidden inventory")
 app.add_typer(export.app, name="export", help="Export recommendations")
+app.add_typer(opportunities.app, name="opportunities", help="New product sourcing opportunities")
 app.add_typer(review.app, name="review", help="Review and approve recommendations")
 
 
@@ -39,7 +40,7 @@ app.add_typer(review.app, name="review", help="Review and approve recommendation
 def version():
     """Show version information."""
     from easyupsell import __version__
-    console.print(f"[bold]easyupsell[/bold] v{__version__}")
+    console.print(f"[bold]pre[/bold] v{__version__}")
 
 
 @app.command()
@@ -68,7 +69,7 @@ def status():
         table.add_row("Validation rate", f"{100 * valid // len(rows) if rows else 0}%")
     else:
         table.add_row("Recommendations", "[red]No analysis found[/red]")
-        table.add_row("Run", "[dim]easyupsell analyze[/dim]")
+        table.add_row("Run", "[dim]pre analyze[/dim]")
     
     console.print(table)
 
@@ -83,9 +84,9 @@ def main(ctx: typer.Context):
     """
     if ctx.invoked_subcommand is None:
         # Show help if no command given
-        console.print("[bold]easyupsell[/bold] - AI-powered upsell recommendations\n")
-        console.print("Run [cyan]easyupsell --help[/cyan] for available commands.")
-        console.print("Quick start: [green]easyupsell analyze[/green]")
+        console.print("[bold]pre[/bold] - AI-powered upsell recommendations\n")
+        console.print("Run [cyan]pre --help[/cyan] for available commands.")
+        console.print("Quick start: [green]pre analyze[/green]")
 
 
 if __name__ == "__main__":

@@ -25,12 +25,12 @@ def test_discover_command_both_args_error():
 
 def test_discover_command_all_valid():
     """Test valid execution with --all."""
-    with patch("easyupsell.commands.discover.BigCommerceClient") as MockBC:
-        with patch("easyupsell.commands.discover.get_all_leaf_categories") as mock_get_leaves:
+    with patch("pre.commands.discover.BigCommerceClient") as MockBC:
+        with patch("pre.commands.discover.get_all_leaf_categories") as mock_get_leaves:
             mock_get_leaves.return_value = [{"name": "Cat1"}, {"name": "Cat2"}]
             
             # Also mock discovery to avoid waiting/errors
-            with patch("easyupsell.commands.discover.discover_dark_horses") as mock_discover:
+            with patch("pre.commands.discover.discover_dark_horses") as mock_discover:
                 mock_discover.return_value = {"pairings": [], "gaps": []}
                 
                 result = runner.invoke(app, ["discover", "--all"])
@@ -41,11 +41,11 @@ def test_discover_command_all_valid():
 
 def test_discover_command_category_valid():
     """Test valid execution with --category."""
-    with patch("easyupsell.commands.discover.BigCommerceClient") as MockBC:
-        with patch("easyupsell.commands.discover.get_all_leaf_categories") as mock_get_leaves:
+    with patch("pre.commands.discover.BigCommerceClient") as MockBC:
+        with patch("pre.commands.discover.get_all_leaf_categories") as mock_get_leaves:
             mock_get_leaves.return_value = [{"name": "Cat1"}]
             
-            with patch("easyupsell.commands.discover.discover_dark_horses") as mock_discover:
+            with patch("pre.commands.discover.discover_dark_horses") as mock_discover:
                 mock_discover.return_value = {"pairings": [], "gaps": []}
                 
                 result = runner.invoke(app, ["discover", "--category", "Boots"])
@@ -56,20 +56,20 @@ def test_discover_command_category_valid():
 
 def test_discover_command_integration():
     """Test that the CLI command calls the core logic."""
-    with patch("easyupsell.commands.discover.BigCommerceClient") as MockBC:
+    with patch("pre.commands.discover.BigCommerceClient") as MockBC:
         # Mock client returning categories
         mock_client = MockBC.from_env.return_value
         
-        with patch("easyupsell.commands.discover.get_all_leaf_categories") as mock_get_leaves:
+        with patch("pre.commands.discover.get_all_leaf_categories") as mock_get_leaves:
             mock_get_leaves.return_value = [{"id": 1, "name": "Boots"}]
             
-            with patch("easyupsell.commands.discover.discover_dark_horses") as mock_discover:
+            with patch("pre.commands.discover.discover_dark_horses") as mock_discover:
                 mock_discover.return_value = {
                     "pairings": [{"source": "Boots", "target": "Socks", "concept": "Socks"}],
                     "gaps": []
                 }
                 
-                with patch("easyupsell.commands.discover.write_dark_horse_results") as mock_write:
+                with patch("pre.commands.discover.write_dark_horse_results") as mock_write:
                     result = runner.invoke(app, ["discover", "--category", "Boots"])
                     
                     assert result.exit_code == 0

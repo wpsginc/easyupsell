@@ -28,10 +28,10 @@ def _run_in_background(args: list[str], log_file: Path) -> int:
     
     # Get the current Python and script
     python = sys.executable
-    script = Path(__file__).parent.parent.parent / "easyupsell" / "cli.py"
+    script = Path(__file__).parent.parent.parent / "pre" / "cli.py"
     
     # Build command - re-invoke without --background
-    cmd = [python, "-m", "easyupsell"] + args
+    cmd = [python, "-m", "pre"] + args
     
     # Open log file
     with open(log_file, "w") as log:
@@ -100,11 +100,11 @@ def analyze(
     Generate category→item recommendations.
     
     Examples:
-        easyupsell analyze                    # Top 50 categories
-        easyupsell analyze --all              # Full catalog  
-        easyupsell analyze -c "Tactical Pants"  # Single category
-        easyupsell analyze -l 100 -i 10       # 100 cats, 10 items each
-        easyupsell analyze --all --background # Run in background
+        pre analyze                    # Top 50 categories
+        pre analyze --all              # Full catalog  
+        pre analyze -c "Tactical Pants"  # Single category
+        pre analyze -l 100 -i 10       # 100 cats, 10 items each
+        pre analyze --all --background # Run in background
     """
     if ctx.invoked_subcommand is not None:
         return

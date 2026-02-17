@@ -17,7 +17,7 @@ def export_main(ctx: typer.Context):
     """Export recommendations."""
     if ctx.invoked_subcommand is None:
         console.print("Available formats: [cyan]peasisoft, csv, json[/cyan]")
-        console.print("Run: [green]easyupsell export peasisoft[/green]")
+        console.print("Run: [green]pre export peasisoft[/green]")
 
 
 @app.command("peasisoft")
@@ -38,7 +38,7 @@ def export_peasisoft(
     """Export to Peasisoft Native Upsell format."""
     if not input_file.exists():
         console.print(f"[red]Error:[/red] {input_file} not found")
-        console.print("Run [cyan]easyupsell analyze[/cyan] first")
+        console.print("Run [cyan]pre analyze[/cyan] first")
         raise typer.Exit(1)
     
     with open(input_file) as f:

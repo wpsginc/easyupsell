@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Add src to path to import core logic
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "easyupsell"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "pre"))
 
 from core.analyzer import save_recommendations
 
