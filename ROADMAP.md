@@ -33,7 +33,7 @@ A **merchandising intelligence tool** — not an IT tool. Built for merchandiser
 
 ---
 
-## Phase 2: Dark Horse Item Analysis ← **NEXT**
+## Phase 2: Dark Horse Item Analysis ✅
 
 "Steak and potato" items we already carry but aren't being bought together.
 
@@ -74,20 +74,23 @@ Products we **don't carry at all** but would sell well as add-ons.
 
 ---
 
-## Phase 4: Integration — NetSuite Queryable API
+## Phase 4: Integration — NetSuite Queryable API ✅
 
-Build PRE into a service that NetSuite can query for structured recommendation data.
+Build PRE into a service that NetSuite and other downstream systems can query for structured recommendation data.
 
 ### 4.1 Service API
-- [ ] REST API endpoint: `GET /recommendations/{product_id}` or `GET /recommendations/{category_id}`
-- [ ] Returns structured JSON: recommended SKUs, confidence, relationship type, margin
-- [ ] Nightly/weekly batch job populates recommendation cache from BQ + LLM
+- [x] REST endpoints: `/v1/recommendations/category/{category_name}`, `/v1/recommendations/sku/{sku}`, `/v1/recommendations/netsuite/{netsuite_id}`, `/v1/health`
+- [x] Read-only API with structured status/error responses and request IDs
+- [x] API auth via `PRE_API_KEYS` + `X-API-Key` header
+- [x] `pre serve` entrypoint to run the API (`uvicorn src.api:app`)
+- [x] Canonical SQLite store with upsert + sync-state tracking
 
 ### 4.2 NetSuite Integration
-- [ ] Custom record type in NetSuite for recommendations
-- [ ] Nightly push of approved recommendations via SuiteQL/REST
-- [ ] Display in NS for users who live there (senior architect request)
-- [ ] Push model preferred — secure, behind firewall, NS auth already solved
+- [x] SQLite-backed read path for approved recommendations to sync
+- [x] `pre sync netsuite` command with rate limiting, retries, orphan handling, and dead-letter logging
+- [ ] Custom record type in NetSuite for recommendations (ops/NS setup)
+- [ ] Nightly/periodic sync schedule and monitoring (infrastructure/config)
+- [ ] NetSuite sandbox-to-production validation gate
 
 ### 4.3 BigCommerce / Peasisoft Sync
 - [ ] BigCommerce Related Products API integration
@@ -103,7 +106,7 @@ Build PRE into a service that NetSuite can query for structured recommendation d
 | CLI | Python + Click/Typer |
 | Data | SQLite cache, CSV export |
 | LLM | Azure OpenAI (GPT-4o) |
-| APIs | BigCommerce V3, NetSuite SuiteQL |
+| APIs | FastAPI, NetSuite REST, BigCommerce V3 |
 | TUI | Textual (Python) |
 | Web | FastAPI + React |
 
@@ -163,7 +166,7 @@ Phases 1–3 are **concept-driven** (LLM brainstorms what *should* pair based on
 
 ---
 
-## Current Status (2026-02-16)
+## Current Status (2026-02-17)
 
 **Phase 1 (CLI Foundation): ✅ Complete**
 - 8,346 recommendations across 758 categories
@@ -180,7 +183,12 @@ Phases 1–3 are **concept-driven** (LLM brainstorms what *should* pair based on
 - CLI: `easyupsell opportunities` (with `--skip-llm` for instant output)
 - Output: `data/new_product_opportunities.xlsx`
 
+**Phase 4 (NetSuite Queryable API): ✅ Implemented**
+- SQLite canonical recommendation DB: `data/recommendations.db`
+- API service + CLI sync command live: `pre serve`, `pre sync netsuite`
+- Remaining blockers are non-code: NetSuite custom record setup and deployment wrappers
+
 **Next Steps:**
 1. LLM-enrich the opportunities report (descriptions, prices, priority)
-2. Phase 4: NetSuite queryable API integration
+2. Deploy/monitor Phase 4 service and sync jobs
 3. Phase 6: Historical product-to-product recommendations

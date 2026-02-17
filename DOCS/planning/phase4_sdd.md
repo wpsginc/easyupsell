@@ -1,10 +1,11 @@
 # Phase 4 SDD v1.2 — PRE Service Layer
 ## SQLite Canonical Store · Read-Only API · NetSuite Upsert Sync
 
-**Status:** Draft (Enterprise Production Grade)
+**Status:** Implemented (Core components shipped, 2026-02-17)
 **Date:** 2026-02-16
 **Author:** David Carroll — synthesized from Antigravity draft, Otto v1.0 rewrite, and DC v1.1 dialectical revision
 **Audience:** DC (IT Director), Peter Cler & Phil (NetSuite Architects), BigCommerce team (5), implementing agents
+**Execution note:** Core DB/API/sync components are implemented in code. Remaining work is operational (deployments, NetSuite record setup, and end-to-end sandbox sign-off).
 
 ---
 
@@ -16,6 +17,7 @@
 | v1.0 | 2026-02-16 | Otto (Claude Opus 4.6) | Full rewrite grounded in actual codebase. Fixed data contract, added risk register, deferred package rename, hardened NS sync spec. |
 | v1.1 | 2026-02-16 | DC + Copilot | Dialectical revision. Added authoritative DDL with UNIQUE constraint, per-request throttling, margin unit standardization, structured error contracts, dead-letter reporting, env-only secrets, PR guardrail checklist. |
 | **v1.2** | **2026-02-16** | **DC + Otto** | **Merge of v1.0 codebase grounding + v1.1 enterprise rigor. Added: rollback procedures, capacity planning, runbook, monitoring alerts, team RACI, data integrity verification, NS sandbox validation gate.** |
+| **v1.3** | **2026-02-17** | **DC + Otto** | **Implemented status update: recommendation DB, API, and NetSuite sync code paths are now present and active in repository.** |
 
 ---
 
@@ -89,14 +91,14 @@ graph TD
 | Review engine | `easyupsell/core/review.py` | ✅ Stable | Wire status updates to SQLite | DC |
 | BigQuery client | `src/bigquery_client.py` | ✅ Stable | No changes | — |
 | Enrichment service | `src/enrichment.py` | ✅ Stable | No changes | — |
-| NetSuite client | `src/netsuite/client.py` | ⚠️ Read-only | **Extend with upsert/create** | DC, validated by Peter |
+| NetSuite client | `src/netsuite/client.py` | ✅ Extended | **Extended with create/update/upsert + typed errors** | DC, validated by Peter |
 | NetSuite auth | `src/netsuite/auth.py` | ✅ Stable (HMAC-SHA256 TBA) | Verify role permissions for custom record writes | Peter |
 | BigCommerce client | `src/bigcommerce/client.py` | ✅ Has write ops | Defer `sync bigcommerce` to Phase 5 | BC team |
 | TTL cache | `src/cache.py` | ✅ Stable | No changes (separate concern from recommendation DB) | — |
 | Store context | `src/context.py` | ✅ Stable | No changes | — |
-| **NEW:** Recommendation DB | `src/db.py` | ❌ | **Create** | DC |
-| **NEW:** REST API | `src/api.py` | ❌ | **Create** | DC |
-| **NEW:** NS sync job | `src/sync/netsuite.py` | ❌ | **Create** | DC, validated by Peter/Phil |
+| **NEW:** Recommendation DB | `src/db.py` | ✅ | **Create** | DC |
+| **NEW:** REST API | `src/api.py` | ✅ | **Create** | DC |
+| **NEW:** NS sync job | `src/sync/netsuite.py` | ✅ | **Create** | DC, validated by Peter/Phil |
 
 ### 2.3 What Does NOT Change (Phase 4 Guardrails)
 

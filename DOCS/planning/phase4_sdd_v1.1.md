@@ -1,12 +1,13 @@
 # Phase 4 SDD v1.1 — PRE Service (SQLite Canonical Store, Read‑Only API, NetSuite Upsert Sync)
 
-**Status:** Draft (Enterprise Production Grade)
+**Status:** Superseded by v1.2
 
 **Date:** 2026-02-16
 
 **Author:** David Carroll + Copilot (rewrite)
 
 **Based on:** Phase 4 SDD draft (Otto/Claude rewrite of Antigravity draft)
+**Note:** This is historical documentation only. Implemented status and operational gaps are tracked in `phase4_sdd.md`.
 
 ---
 

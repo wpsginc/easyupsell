@@ -24,12 +24,28 @@ Tools for optimizing [Peasisoft Native Upsell](https://welcome.peasisoft.com/nat
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.template .env   # Add BC + LLM credentials
+cp .env.template .env   # Add BC + LLM + PRE credentials
 
 # Analysis pipeline
 easyupsell analyze              # Generate upsell recommendations
 easyupsell review               # Review and approve recommendations
 easyupsell export               # Export recommendations to formats
+
+# Phase 4 service layer
+easyupsell serve                 # Start FastAPI recommendation API on port 8090
+easyupsell sync netsuite         # Push approved recommendations to NetSuite
+```
+
+For legacy artifacts, continue using existing CSV/XLSX outputs.
+Phase 4 also writes canonical data to `data/recommendations.db`.
+
+If you already have historical CSVs, migrate them with:
+
+```bash
+python scripts/migrate_csv_to_db.py \
+  --csv data/full_recommendations_v2.csv \
+  --xlsx data/dark_horse_discovery_glm_q8_reviewed.xlsx \
+  --db data/recommendations.db
 ```
 
 ## CLI Commands
@@ -41,16 +57,58 @@ Run `easyupsell --help` to see all available commands.
 | `easyupsell analyze` | Generate upsell recommendations with LLM validation |
 | `easyupsell review` | Review and approve recommendations |
 | `easyupsell export` | Export recommendations to various formats |
+| `easyupsell serve` | Start read-only recommendation API (`/v1/...`) |
+| `easyupsell sync netsuite` | Push approved recommendations into NetSuite |
 | `easyupsell brands` | Manage priority brand list |
 | `easyupsell discover` | Discover hidden inventory |
 | `easyupsell config` | Configure API connections |
 
+## Recommendation API
+
+The Phase 4 API is a read-only service for downstream systems.
+
+Default endpoint host/port are `0.0.0.0:8090` and can be overridden with
+`--host` / `--port` or config variables in `config.toml`.
+
+Endpoints:
+
+- `GET /v1/health`
+- `GET /v1/recommendations/category/{category_name}`
+- `GET /v1/recommendations/sku/{sku}`
+- `GET /v1/recommendations/netsuite/{netsuite_id}`
+
+API auth:
+
+- Provide `PRE_API_KEYS` in `.env` as a comma-separated list.
+- Send `X-API-Key` header on all endpoints except `/v1/health`.
+- Example:
+  - `curl http://localhost:8090/v1/health`
+  - `curl -H "X-API-Key: my-key" "http://localhost:8090/v1/recommendations/category/Tactical%20Boots"`
+
+## NetSuite Sync
+
+After review (`status=active`) run:
+
+```bash
+easyupsell sync netsuite --max-rpm 40
+```
+
+Useful flags:
+
+- `--dry-run` build payloads and validate mappings with zero API calls
+- `--force` include already-synced records
+
 ## LLM Providers
 
-Configure in `.env`:
 - **OpenAI** — `OPENAI_API_KEY` (gpt-4o-mini)
 - **Ollama** — `OLLAMA_HOST` (local llama3.2)
 - **LiteLLM** — `LITELLM_HOST` (Moltbot/Athena proxy)
+
+## Data & API Runtime
+
+- `PRE_DB_PATH` (optional): override DB path (defaults to `data/recommendations.db`)
+- `PRE_API_KEYS`: comma-separated API keys required by `easyupsell serve`
+- `PRE_API_KEY_REQUIRED=false` to disable key checks for local testing
 
 ## Customizing
 
