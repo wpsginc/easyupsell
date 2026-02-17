@@ -11,6 +11,7 @@ that generated the pairings. E.g. GLM brainstorms → GPT-OSS reviews.
 import sys
 import json
 import logging
+import os
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -314,3 +315,35 @@ def write_reviewed_excel(
     wb.save(excel_path)
     
     return {"keeps": len(keeps), "rejects": len(rejects), "gaps": len(gaps)}
+
+
+def sync_review_decisions_to_db(
+    scored_pairings: List[Dict],
+    db_path: str | Path | None = None,
+    min_score: int = 2,
+) -> int:
+    """
+    Apply review decisions to recommendation DB status.
+
+    keep=True and relevance_score >= min_score => status='active'
+    otherwise => status='rejected'
+    """
+    from src.db import RecommendationDB
+
+    resolved_path = Path(db_path) if db_path else Path(os.getenv("PRE_DB_PATH", "data/recommendations.db"))
+    db = RecommendationDB(resolved_path)
+    db.init_db()
+
+    updated = 0
+    for pairing in scored_pairings:
+        source_category = (pairing.get("source_category") or "").strip()
+        target_sku = (pairing.get("target_sku") or "").strip()
+        if not source_category or not target_sku:
+            continue
+
+        keep = bool(pairing.get("keep", True))
+        score = pairing.get("relevance_score", 0) or 0
+        status = "active" if keep and score >= min_score else "rejected"
+        updated += db.update_status_by_keys(source_category, target_sku, status)
+
+    return updated

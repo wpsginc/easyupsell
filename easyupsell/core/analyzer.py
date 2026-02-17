@@ -5,6 +5,7 @@ Wraps the prototype analysis logic into a clean interface.
 """
 
 import csv
+import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -340,3 +341,28 @@ def save_recommendations(recommendations: list[dict], output_path: Path):
             -x.get("item_orders_6mo", 0),
         )):
             writer.writerow(r)
+
+    # Phase 4 transition: keep CSV output but also persist to SQLite canonical store.
+    from src.db import RecommendationDB
+
+    db_path = Path(os.getenv("PRE_DB_PATH", "data/recommendations.db"))
+    db = RecommendationDB(db_path)
+    db.init_db()
+
+    for r in recommendations:
+        db.upsert_recommendation(
+            {
+                "source_category": r.get("source_category"),
+                "target_sku": r.get("recommended_sku"),
+                "target_netsuite_id": r.get("recommended_netsuite_id"),
+                "target_name": r.get("recommended_name"),
+                "target_price": r.get("recommended_price"),
+                "score": r.get("llm_confidence", 0.0),
+                "reasoning": r.get("llm_reason"),
+                "relationship_type": r.get("relationship_type"),
+                "status": "active" if bool(r.get("llm_valid")) else "pending_review",
+                "copurchase_count": r.get("enrichment_copurchase_count", 0),
+                "margin": r.get("enrichment_margin", 0.0),
+                "velocity": r.get("enrichment_velocity", 0.0),
+            }
+        )

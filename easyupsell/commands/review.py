@@ -19,6 +19,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCo
 from easyupsell.core.review import (
     load_pairings_from_excel,
     review_all_pairings,
+    sync_review_decisions_to_db,
     write_reviewed_excel,
 )
 
@@ -180,6 +181,10 @@ def review(
     
     console.print(f"\n  [green]✓ Keeping:[/green]  {len(keeps)}")
     console.print(f"  [red]✗ Rejected:[/red] {len(rejects)}")
+
+    # Phase 4 transition: persist review decisions into canonical SQLite store.
+    updated = sync_review_decisions_to_db(scored, min_score=min_score)
+    console.print(f"  [cyan]DB status updates:[/cyan] {updated}")
     
     # 6. Write output
     stats = write_reviewed_excel(scored, gaps, output_path, min_score=min_score)

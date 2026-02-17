@@ -11,6 +11,7 @@ Usage:
 """
 
 import typer
+from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
@@ -34,6 +35,8 @@ app.add_typer(discover.app, name="discover", help="Discover hidden inventory")
 app.add_typer(export.app, name="export", help="Export recommendations")
 app.add_typer(opportunities.app, name="opportunities", help="New product sourcing opportunities")
 app.add_typer(review.app, name="review", help="Review and approve recommendations")
+sync_app = typer.Typer(name="sync", help="Sync recommendations to external systems")
+app.add_typer(sync_app)
 
 
 @app.command()
@@ -41,6 +44,17 @@ def version():
     """Show version information."""
     from easyupsell import __version__
     console.print(f"[bold]pre[/bold] v{__version__}")
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("0.0.0.0", "--host", help="API host"),
+    port: int = typer.Option(8090, "--port", help="API port"),
+):
+    """Start the PRE recommendation API server."""
+    import uvicorn
+
+    uvicorn.run("src.api:app", host=host, port=port, reload=False)
 
 
 @app.command()
@@ -72,6 +86,39 @@ def status():
         table.add_row("Run", "[dim]pre analyze[/dim]")
     
     console.print(table)
+
+
+@sync_app.command("netsuite")
+def sync_netsuite(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Build payloads but make zero API calls"),
+    max_rpm: int = typer.Option(40, "--max-rpm", help="Max NetSuite requests per minute"),
+    batch_size: int = typer.Option(50, "--batch-size", help="Batch size for DB read loop"),
+    force: bool = typer.Option(False, "--force", help="Include already-synced records"),
+):
+    """Push approved recommendations to NetSuite."""
+    import os
+    from src.db import RecommendationDB
+    from src.netsuite.client import NetSuiteClient
+    from src.sync.netsuite import NetSuiteSyncJob
+
+    db_path = Path(os.getenv("PRE_DB_PATH", "data/recommendations.db"))
+    db = RecommendationDB(db_path)
+    db.init_db()
+
+    ns_client = NetSuiteClient.from_env()
+    job = NetSuiteSyncJob(db=db, ns_client=ns_client, max_rpm=max_rpm, batch_size=batch_size)
+    result = job.run(dry_run=dry_run, force=force)
+
+    console.print("\n[bold]PRE NetSuite Sync Complete[/bold]")
+    console.print(f"  Job ID:    {result.job_id}")
+    console.print(f"  Duration:  {result.duration}")
+    console.print(f"  Synced:    {result.synced}")
+    console.print(f"  Failed:    {result.failed}")
+    console.print(f"  Orphaned:  {result.orphaned}")
+    console.print(f"  Skipped:   {result.skipped}")
+
+    if result.failed > 0 and not dry_run:
+        raise typer.Exit(1)
 
 
 @app.callback(invoke_without_command=True)

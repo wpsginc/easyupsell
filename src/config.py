@@ -17,6 +17,7 @@ def _load_toml_config() -> dict:
     # Flatten nested TOML into Settings field names
     llm = raw.get("llm", {})
     analysis = raw.get("analysis", {})
+    api = raw.get("api", {})
     
     flat = {}
     
@@ -60,6 +61,14 @@ def _load_toml_config() -> dict:
         flat["MAX_BATCH_SIZE"] = analysis["max_batch_size"]
     if "batch_timeout_seconds" in analysis:
         flat["BATCH_TIMEOUT_SECONDS"] = analysis["batch_timeout_seconds"]
+
+    # API
+    if "host" in api:
+        flat["API_HOST"] = api["host"]
+    if "port" in api:
+        flat["API_PORT"] = api["port"]
+    if "api_key_required" in api:
+        flat["API_KEY_REQUIRED"] = api["api_key_required"]
     
     return flat
 
@@ -111,6 +120,9 @@ class Settings(BaseSettings):
     # Feature Flags / Parameters
     MAX_BATCH_SIZE: int = _toml_defaults.get("MAX_BATCH_SIZE", 50)
     BATCH_TIMEOUT_SECONDS: int = _toml_defaults.get("BATCH_TIMEOUT_SECONDS", 300)
+    API_HOST: str = _toml_defaults.get("API_HOST", "0.0.0.0")
+    API_PORT: int = int(_toml_defaults.get("API_PORT", 8090))
+    API_KEY_REQUIRED: bool = bool(_toml_defaults.get("API_KEY_REQUIRED", True))
 
     model_config = SettingsConfigDict(
         env_file=".env",
