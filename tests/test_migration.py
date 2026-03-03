@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 from src.db import RecommendationDB
@@ -94,6 +95,8 @@ def test_summary_output(tmp_path: Path):
     db_path = tmp_path / "recommendations.db"
     _write_fixture_csv(csv_path)
 
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parent.parent)
     result = subprocess.run(
         [
             sys.executable,
@@ -107,8 +110,89 @@ def test_summary_output(tmp_path: Path):
         capture_output=True,
         text=True,
         check=False,
+        env=env,
     )
     assert result.returncode == 0, result.stderr
     assert "Migrated 10 recommendations" in result.stdout
     assert "active" in result.stdout
     assert "pending_review" in result.stdout
+
+
+def test_xlsx_fixture_migration(tmp_path: Path):
+    from openpyxl import Workbook
+    from scripts.migrate_csv_to_db import migrate_csv_to_db
+
+    csv_path = tmp_path / "full_recommendations_v2.csv"
+    _write_fixture_csv(csv_path)
+
+    xlsx_path = tmp_path / "dark_horse.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    if ws is None:
+        ws = wb.create_sheet("Reviewed Pairings")
+    else:
+        ws.title = "Reviewed Pairings"
+
+    headers = [
+        "source_category",
+        "target_sku",
+        "target_category",
+        "relevance_score",
+        "review_note",
+        "keep",
+        "relationship_type",
+        "copurchase_count",
+        "margin_pct",
+        "sales_velocity",
+    ]
+    ws.append(headers)
+
+    ws.append(
+        [
+            "Tactical Boots",
+            "SKU-XLSX-001",
+            "Boot Laces",
+            5,
+            "Great match",
+            True,
+            "accessory",
+            10,
+            "0.55",
+            200,
+        ]
+    )
+
+    ws.append(
+        [
+            "Duty Belts",
+            "SKU-XLSX-002",
+            "Weak Match",
+            1,
+            "Weak",
+            True,
+            "complement",
+            0,
+            "0.10",
+            50,
+        ]
+    )
+
+    wb.save(xlsx_path)
+
+    db_path = tmp_path / "recommendations.db"
+
+    summary = migrate_csv_to_db(csv_path=csv_path, xlsx_path=xlsx_path, db_path=db_path)
+
+    assert summary["total"] == 12
+
+    assert summary["active"] == 6
+    assert summary["pending_review"] == 6
+
+    db = RecommendationDB(db_path)
+    with db._connect(read_only=True) as conn:
+        row = conn.execute(
+            "SELECT * FROM recommendations WHERE target_sku = 'SKU-XLSX-001'"
+        ).fetchone()
+        assert row["source_category"] == "Tactical Boots"
+        assert row["status"] == "active"
+        assert row["score"] == 1.0
