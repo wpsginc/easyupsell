@@ -62,15 +62,15 @@ A **merchandising intelligence tool** — not an IT tool. Built for merchandiser
 Products we **don't carry at all** but would sell well as add-ons.
 
 ### 3.1 Gap Analysis
-- [ ] LLM "what's missing?" analysis per category
+- [x] LLM "what's missing?" analysis per category
   - Feed category name + current catalog → ask "what complementary products should we carry?"
-- [ ] Suggestions that match NO existing SKU → flag as "New Product Opportunity"
+- [x] Suggestions that match NO existing SKU → flag as "New Product Opportunity"
 - [ ] Examples: Boots → shoe trees, leather conditioner | Helmets → anti-fog wipes | Radios → speaker mics
 
 ### 3.2 Output
-- [ ] Separate "New Product Opportunities" report
-- [ ] Include suggested product description, estimated price range, target categories
-- [ ] Actionable buying leads for the merchandising/purchasing team
+- [x] Separate "New Product Opportunities" report
+- [x] Include suggested product description, estimated price range, target categories
+- [x] Actionable buying leads for the merchandising/purchasing team
 
 ---
 
@@ -178,7 +178,7 @@ Phases 1–3 are **concept-driven** (LLM brainstorms what *should* pair based on
 - Enriched output: SKU, margin, velocity, copurchase, high-priority flag
 - Output: `data/dark_horse_discovery_glm_q8_reviewed.xlsx`
 
-**Phase 3 (Opportunities): ✅ Pipeline Built**
+**Phase 3 (Opportunities): ✅ Complete**
 - 1,647 unique product types from 4,314 catalog gaps
 - CLI: `easyupsell opportunities` (with `--skip-llm` for instant output)
 - Output: `data/new_product_opportunities.xlsx`
@@ -189,6 +189,5 @@ Phases 1–3 are **concept-driven** (LLM brainstorms what *should* pair based on
 - Remaining blockers are non-code: NetSuite custom record setup and deployment wrappers
 
 **Next Steps:**
-1. LLM-enrich the opportunities report (descriptions, prices, priority)
-2. Deploy/monitor Phase 4 service and sync jobs
-3. Phase 6: Historical product-to-product recommendations
+1. Deploy/monitor Phase 4 service and sync jobs
+2. Phase 6: Historical product-to-product recommendations

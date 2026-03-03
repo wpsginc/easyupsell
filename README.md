@@ -27,6 +27,9 @@ pip install -r requirements.txt
 cp .env.template .env   # Add BC + LLM + PRE credentials
 
 # Analysis pipeline
+easyupsell discover --all           # Build catalog gap candidates
+easyupsell opportunities            # Generate Phase 3 opportunities report
+easyupsell opportunities --skip-llm  # Skip LLM enrichment for quick preview
 easyupsell analyze              # Generate upsell recommendations
 easyupsell review               # Review and approve recommendations
 easyupsell export               # Export recommendations to formats
@@ -38,6 +41,10 @@ easyupsell sync netsuite         # Push approved recommendations to NetSuite
 
 For legacy artifacts, continue using existing CSV/XLSX outputs.
 Phase 4 also writes canonical data to `data/recommendations.db`.
+
+Phase 3 flow note: `easyupsell discover --all` writes `data/catalog_gaps.csv`.
+`easyupsell opportunities` consumes that file by default to build
+`data/new_product_opportunities.xlsx`.
 
 If you already have historical CSVs, migrate them with:
 
@@ -57,10 +64,12 @@ Run `easyupsell --help` to see all available commands.
 | `easyupsell analyze` | Generate upsell recommendations with LLM validation |
 | `easyupsell review` | Review and approve recommendations |
 | `easyupsell export` | Export recommendations to various formats |
+| `easyupsell opportunities` | Build sourcing opportunities from catalog gaps |
 | `easyupsell serve` | Start read-only recommendation API (`/v1/...`) |
 | `easyupsell sync netsuite` | Push approved recommendations into NetSuite |
 | `easyupsell brands` | Manage priority brand list |
 | `easyupsell discover` | Discover hidden inventory |
+| `easyupsell opportunities --skip-llm` | Skip LLM enrichment while writing report |
 | `easyupsell config` | Configure API connections |
 
 ## Recommendation API

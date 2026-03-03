@@ -15,7 +15,13 @@ Usage:
 import typer
 from pathlib import Path
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    MofNCompleteColumn,
+)
 
 from easyupsell.core.opportunities import (
     load_and_deduplicate_gaps,
@@ -37,12 +43,20 @@ def opportunities(
     ),
     provider: str = typer.Option("azure", help="LLM provider for enrichment"),
     batch_size: int = typer.Option(20, help="Items per LLM enrichment batch"),
-    skip_llm: bool = typer.Option(False, "--skip-llm", help="Skip LLM enrichment (instant output)"),
-    output: str = typer.Option(None, help="Output Excel path (default: data/new_product_opportunities.xlsx)"),
+    skip_llm: bool = typer.Option(
+        False, "--skip-llm", help="Skip LLM enrichment (instant output)"
+    ),
+    output: str = typer.Option(
+        None, help="Output Excel path (default: data/new_product_opportunities.xlsx)"
+    ),
 ):
     """Identify new product sourcing opportunities from catalog gaps."""
     if ctx.invoked_subcommand is not None:
         return
+
+    if batch_size <= 0:
+        console.print("[red]Error: batch_size must be a positive integer[/red]")
+        raise typer.Exit(1)
 
     input_path = Path(input_file)
 
@@ -53,11 +67,17 @@ def opportunities(
             input_path = backup_path
             console.print(f"  [dim]Using backup:[/dim] {input_path}")
         else:
-            console.print(f"[red]Error: Catalog gaps file not found:[/red] {input_file}")
-            console.print("[dim]Run 'pre discover --all' first to generate catalog gaps.[/dim]")
+            console.print(
+                f"[red]Error: Catalog gaps file not found:[/red] {input_file}"
+            )
+            console.print(
+                "[dim]Run 'pre discover --all' first to generate catalog gaps.[/dim]"
+            )
             raise typer.Exit(1)
 
-    output_path = Path(output) if output else Path("data/new_product_opportunities.xlsx")
+    output_path = (
+        Path(output) if output else Path("data/new_product_opportunities.xlsx")
+    )
 
     # 1. Load and deduplicate
     console.print(f"\n[bold]Phase 3: New Product Opportunities[/bold]")
@@ -69,7 +89,9 @@ def opportunities(
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(1)
 
-    console.print(f"  [cyan]{len(detail_rows)}[/cyan] total gaps → [cyan]{len(opportunities_list)}[/cyan] unique product types")
+    console.print(
+        f"  [cyan]{len(detail_rows)}[/cyan] total gaps → [cyan]{len(opportunities_list)}[/cyan] unique product types"
+    )
 
     if not opportunities_list:
         console.print("[yellow]No gaps found. Nothing to report.[/yellow]")
@@ -84,7 +106,9 @@ def opportunities(
 
     # 2. Optional LLM enrichment
     if not skip_llm:
-        console.print(f"\n[bold]Enriching with LLM:[/bold] {provider} (batch_size={batch_size})")
+        console.print(
+            f"\n[bold]Enriching with LLM:[/bold] {provider} (batch_size={batch_size})"
+        )
 
         with Progress(
             SpinnerColumn(),
@@ -96,7 +120,9 @@ def opportunities(
             task = progress.add_task("Enriching...", total=len(opportunities_list))
 
             def on_progress(done, total):
-                progress.update(task, completed=done, description=f"Enriched {done}/{total}...")
+                progress.update(
+                    task, completed=done, description=f"Enriched {done}/{total}..."
+                )
 
             opportunities_list = enrich_opportunities_batch(
                 opportunities_list,
@@ -121,6 +147,6 @@ def opportunities(
 
     console.print(f"\n[green]✓[/green] Saved to [bold]{output_path}[/bold]")
     console.print(f"  {stats['total_opportunities']} unique product opportunities")
-    if stats['high_priority']:
+    if stats["high_priority"]:
         console.print(f"  [green]★ {stats['high_priority']} high priority[/green]")
     console.print(f"  {stats['detail_rows']} detail rows for drill-down")
